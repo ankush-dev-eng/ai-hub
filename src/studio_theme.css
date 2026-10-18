@@ -1208,3 +1208,14 @@ div[data-testid="stSegmentedControl"] button[data-active="true"] {
   transform: translate(-50%, 1px) scale(0.96) !important;
 }
 
+/* Collapses hidden TTS streaming iframes so they add no blank layout gaps */
+[class*="st-key-tts_sink"] {
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

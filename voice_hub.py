@@ -1,23 +1,34 @@
 """
 voice_hub.py - Voice in/out for the AI Hub chat.
 
-STT: Groq Whisper (whisper-large-v3-turbo) with automatic fallback to local faster-whisper on CPU.
-TTS: Edge-TTS (free, Microsoft Neural voices: Indian English, Hindi, Marathi, US English).
-No re-send loop: Hashes recordings and rotates widget keys on completion.
+pip install edge-tts            # TTS (free, unofficial MS endpoint)
+pip install faster-whisper      # optional local STT fallback (CPU)
+Needs streamlit>=1.39 (st.audio_input). Mic needs HTTPS or localhost.
+
+Public API:
+    cfg   = voice_hub.sidebar()                 # settings in sidebar
+    text  = voice_hub.mic_input(cfg)            # str | None  (put in dock toolbar)
+    speaker = voice_hub.make_speaker(cfg, via_voice)   # streaming TTS; pass into run_chain
+    voice_hub.speak(reply, cfg, via_voice)      # whole-reply fallback (non-streaming paths)
 """
 import asyncio
+import base64
 import hashlib
 import io
+import json
 import os
 import re
+import uuid
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
 load_dotenv()
 
 import streamlit as st
+import streamlit.components.v1 as components
 
-WHISPER_MODEL = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
+WHISPER_MODEL = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")  # edit if Groq renames it
 LOCAL_WHISPER = os.getenv("LOCAL_WHISPER", "small")
 
 VOICES = {
@@ -116,20 +127,22 @@ def speak(text: str, cfg: dict, via_voice: bool = False):
 # ---------- UI ----------
 def sidebar() -> dict:
     sb = st.sidebar
-    sb.markdown("### 🎙️ Voice Settings")
-    mode = sb.selectbox("Speak replies", MODES, key="vh_mode")
-    voice = VOICES[sb.selectbox("Voice", list(VOICES.keys()), key="vh_voice")]
-    rate = sb.slider("Speed", -30, 50, 0, 5, format="%d%%", key="vh_rate")
-    lang = LANGS[sb.selectbox("Speech language", list(LANGS.keys()), key="vh_lang")]
+    sb.markdown("### 🎙️ Voice")
+    mode = sb.selectbox("Speak replies", MODES)
+    voice = VOICES[sb.selectbox("Voice", list(VOICES.keys()))]
+    rate = sb.slider("Speed", -30, 50, 0, 5, format="%d%%")
+    lang = LANGS[sb.selectbox("Speech language", list(LANGS.keys()))]
+    if sb.button("🔇 Stop audio", use_container_width=True):
+        _run_js("window.parent.__ttsq && window.parent.__ttsq.stop();")
     return {"mode": mode, "voice": voice, "rate": f"{rate:+d}%", "lang": lang}
 
 
 def mic_input(cfg: dict):
-    """Render recorder. Returns transcript once per recording."""
+    """Render recorder (put inside the dock toolbar). Returns transcript once per recording."""
     ss = st.session_state
     ss.setdefault("mic_n", 0)
-    with st.popover("🎙️ Voice Input", use_container_width=True):
-        audio = st.audio_input("Record message (click to stop & send)", key=f"mic_{ss.mic_n}")
+    with st.popover("🎙️ Speak"):
+        audio = st.audio_input("Click to record, click again to send", key=f"mic_{ss.mic_n}")
     if audio is None:
         return None
     data = audio.getvalue()
@@ -137,7 +150,183 @@ def mic_input(cfg: dict):
     if h == ss.get("mic_last"):
         return None
     ss.mic_last = h
-    with st.spinner("Transcribing with Whisper..."):
+    with st.spinner("Transcribing..."):
         text = transcribe(data, cfg["lang"])
     ss.mic_n += 1  # fresh widget key next run -> recorder resets, no re-send loop
     return text or None
+
+
+# =====================================================================
+# Sentence-level streaming TTS
+# ---------------------------------------------------------------------
+# Server: text deltas -> sentence splitter -> parallel edge-tts workers (ordered) -> base64 mp3.
+# Client: a tiny player living in the PARENT window (survives Streamlit reruns/iframe
+# teardown) plays clips back-to-back. Per-sentence st.audio(autoplay=True) would make
+# every clip start at once, hence the queue.
+# =====================================================================
+PLAYER_SRC = """(function(){var q=[],cur=null;
+function next(){if(cur||!q.length)return;var a=new Audio(q.shift());cur=a;
+a.onended=a.onerror=function(){cur=null;next();};
+var p=a.play();if(p&&p.catch)p.catch(function(){cur=null;q=[];window.__ttsq.blocked=true;});}
+window.__ttsq={blocked:false,
+add:function(s,r){if(r)this.stop();for(var i=0;i<s.length;i++)q.push(s[i]);next();},
+stop:function(){q=[];if(cur){cur.onended=cur.onerror=null;cur.pause();cur=null;}}};})();"""
+
+_ADD_HTML = ("<script>(function(){var P=window.parent;"
+             "if(!P.__ttsq){var s=P.document.createElement('script');s.textContent=__PLAYER__;P.document.head.appendChild(s);}"
+             "P.__ttsq.add(__SRCS__,__RESET__);})();</script>")
+
+
+def _run_js(js: str):
+    components.html(f"<script>{js}</script>", height=0)
+
+
+def synth_raw(text: str, voice: str, rate: str) -> bytes:
+    """Uncached, no Streamlit calls - safe in worker threads."""
+    return asyncio.run(_synth(text, voice, rate))
+
+
+def _pick_voice(clean: str, voice: str) -> str:
+    if re.search(r"[\u0900-\u097F]", clean) and not voice.startswith(("hi-", "mr-")):
+        return "hi-IN-SwaraNeural"
+    return voice
+
+
+class NullSpeaker:
+    def feed(self, delta): pass
+    def flush(self): pass
+    def restart(self): pass
+    def close(self): pass
+
+
+class SentenceSpeaker:
+    FIRST_MIN = 20     # chars before the FIRST clip may be cut (low = faster first audio)
+    NEXT_MIN = 45      # later clips are longer -> smoother prosody
+    FORCE_CUT = 240    # no punctuation for this long -> cut at a comma/space
+    MAX_CHARS = 1400   # stop speaking after this many chars (edge-tts + patience)
+
+    def __init__(self, cfg, synth_fn=None, emit_fn=None):
+        self.cfg = cfg
+        self.synth = synth_fn or synth_raw
+        self._emit_fn = emit_fn or self._emit_default
+        self.pool = ThreadPoolExecutor(3)
+        self.q = deque()          # futures, in sentence order
+        self.buf = ""
+        self.sent = 0
+        self.chars = 0
+        self.started = False
+        self.err = None
+        self._sink = None
+
+    # ---- public ----
+    def feed(self, delta: str):
+        self.buf += delta
+        self._pump(final=False)
+        self._drain(wait=False)
+
+    def flush(self):
+        self._pump(final=True)
+        self._drain(wait=True)
+        self.pool.shutdown(wait=False)
+        if self.err and not self.started:
+            st.toast(f"TTS failed: {self.err[:70]}", icon="🔇")
+
+    def restart(self):
+        """Provider failed mid-stream: drop pending speech, silence what is playing."""
+        for f in self.q:
+            f.cancel()
+        self.q.clear()
+        self.buf, self.sent, self.chars = "", 0, 0
+        if self.started:
+            self._emit_fn([], True)
+        self.started = False
+
+    def close(self):
+        self.pool.shutdown(wait=False, cancel_futures=True)
+
+    # ---- internals ----
+    def _pump(self, final: bool):
+        buf = re.sub(r"```.*?```", "\n(code omitted)\n", self.buf, flags=re.S)
+        buf = re.sub(r"<think>.*?</think>", "", buf, flags=re.S)
+        cut = len(buf)
+        for mark in ("```", "<think>"):          # unterminated block: hold it back
+            i = buf.find(mark)
+            if i != -1:
+                cut = min(cut, i)
+        head, held = buf[:cut], buf[cut:]
+        if not final:                              # half-typed marker like "``" or "<thi"
+            m = re.search(r"(`{1,2}|<(?:t|th|thi|thin|think)?)$", head)
+            if m:
+                head, held = head[: m.start()], head[m.start():] + held
+        if final:
+            held = ""
+        segs, rest = self._split(head, final)
+        self.buf = rest + held
+        for s in segs:
+            self._submit(s)
+
+    def _split(self, head: str, final: bool):
+        segs, start, n = [], 0, len(head)
+        for k, ch in enumerate(head):
+            if ch == "\n":
+                end = k + 1
+            elif ch in ".!?।" and k + 1 < n and head[k + 1].isspace():
+                end = k + 1
+            else:
+                continue
+            need = self.FIRST_MIN if (self.sent + len(segs)) == 0 else self.NEXT_MIN
+            if len(speakable(head[start:end], 10**6)) >= need:   # also merges "1." / "e.g."
+                segs.append(head[start:end])
+                start = end
+        rest = head[start:]
+        if not final and len(rest) > self.FORCE_CUT:
+            j = max(rest.rfind(", "), rest.rfind("; "), rest.rfind(": "))
+            if j <= 60:
+                j = rest.rfind(" ")
+            if j > 60:
+                segs.append(rest[: j + 1])
+                rest = rest[j + 1:]
+        if final and rest.strip():
+            segs.append(rest)
+            rest = ""
+        return segs, rest
+
+    def _submit(self, seg: str):
+        clean = speakable(seg, 10**6)
+        if not clean or self.chars >= self.MAX_CHARS:
+            return
+        self.chars += len(clean)
+        self.sent += 1
+        voice = _pick_voice(clean, self.cfg["voice"])
+        self.q.append(self.pool.submit(self.synth, clean, voice, self.cfg["rate"]))
+
+    def _drain(self, wait: bool):
+        ready = []
+        while self.q and (wait or self.q[0].done()):   # strictly in order
+            f = self.q.popleft()
+            try:
+                b = f.result(timeout=25)
+            except Exception as e:
+                self.err = str(e)
+                continue
+            if b:
+                ready.append(b)
+        if ready:
+            self._emit_fn(ready, not self.started)
+            self.started = True
+
+    def _emit_default(self, blobs, reset):
+        if self._sink is None:
+            self._sink = st.container(key=f"tts_sink_{uuid.uuid4().hex[:8]}")
+        srcs = ["data:audio/mp3;base64," + base64.b64encode(b).decode() for b in blobs]
+        html = (_ADD_HTML.replace("__PLAYER__", json.dumps(PLAYER_SRC))
+                         .replace("__SRCS__", json.dumps(srcs))
+                         .replace("__RESET__", "true" if reset else "false"))
+        with self._sink:
+            components.html(html, height=0)
+
+
+def make_speaker(cfg: dict, via_voice: bool = False):
+    if cfg["mode"] == "Off" or (cfg["mode"] == MODES[0] and not via_voice):
+        return NullSpeaker()
+    return SentenceSpeaker(cfg)

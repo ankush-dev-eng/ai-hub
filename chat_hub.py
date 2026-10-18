@@ -227,7 +227,7 @@ def stream_one(p: Dict[str, Any], model: str, messages: List[Dict[str, Any]], te
             yield ch.choices[0].delta.content
 
 
-def run_chain(reg: Dict[str, Any], chain: List[Tuple[str, str]], messages: List[Dict[str, Any]], temp: float, slot) -> Tuple[str, str]:
+def run_chain(reg: Dict[str, Any], chain: List[Tuple[str, str]], messages: List[Dict[str, Any]], temp: float, slot, speaker=None) -> Tuple[str, str]:
     """Tries each (provider, model) in chain until one completes successfully."""
     for pname, model in chain:
         text = ""
@@ -235,11 +235,19 @@ def run_chain(reg: Dict[str, Any], chain: List[Tuple[str, str]], messages: List[
             for delta in stream_one(reg[pname], model, messages, temp):
                 text += delta
                 slot.markdown(text + " ▌")
+                if speaker:
+                    speaker.feed(delta)
             slot.markdown(text)
+            if speaker:
+                speaker.flush()
             return text, f"{pname} · {model}"
         except Exception as e:
+            if speaker:
+                speaker.restart()
             err_msg = str(e)[:90]
             st.toast(f"⚠️ {pname} failed ({err_msg}) — Routing to next fallback...", icon="⚡")
+    if speaker:
+        speaker.close()
     fallback_msg = "⚠️ All providers in failover chain failed. Please verify API keys, active models, or Colab tunnel status."
     slot.markdown(fallback_msg)
     return fallback_msg, "none"
@@ -504,9 +512,10 @@ def render_chat():
 
     with st.chat_message("assistant"):
         slot = st.empty()
+        speaker = voice_hub.make_speaker(vcfg, via_voice)
         api_msgs = to_api(sys_prompt, ss.ch_hist)
         t0 = time.perf_counter()
-        text, used = run_chain(reg, chain, api_msgs, temp, slot)
+        text, used = run_chain(reg, chain, api_msgs, temp, slot, speaker=speaker)
         elapsed = time.perf_counter() - t0
 
         st.caption(f"⚡ {used} · {elapsed:.2f}s")
@@ -514,9 +523,6 @@ def render_chat():
             with st.expander("📚 Retrieved Document Chunks (ChromaDB)", expanded=False):
                 for cit in citations:
                     st.markdown(f"- **{cit['source']}** (Chunk {cit['chunk']}): `{cit['text']}`")
-
-        # Synthesize audio speech if active
-        voice_hub.speak(text, vcfg, via_voice)
 
     ss.ch_hist.append({"role": "assistant", "content": text, "used": used, "citations": citations})
     st.rerun()
