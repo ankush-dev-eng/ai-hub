@@ -162,10 +162,10 @@
       $$(CARD).forEach(function (n) { 
         if (!n.classList.contains('fx-card')) n.classList.add('fx-card'); 
       });
-      $$('select, div[data-baseweb="select"] input').forEach(function (i) { 
-        if (i.tagName === 'INPUT' && !i.readOnly) { 
-          i.readOnly = true; 
-          i.setAttribute('inputmode', 'none'); 
+      $$('.react-aria-ComboBox input, [role="combobox"], [data-rac] input, select, div[data-baseweb="select"] input').forEach(function (i) { 
+        if (i.tagName === 'INPUT') { 
+          i.style.caretColor = 'transparent'; 
+          i.style.cursor = 'pointer'; 
         } 
       });
     }
@@ -373,6 +373,24 @@
     on(back, 'mousedown', function (e) { 
       if (e.target === back) close(); 
     });
+
+    on(doc, 'click', function (e) {
+      var pill = e.target && e.target.closest ? e.target.closest('.fx-cmd-pill, [data-action="open-palette"]') : null;
+      if (pill) {
+        e.preventDefault();
+        e.stopPropagation();
+        open();
+        return;
+      }
+      var comboInp = e.target && e.target.closest ? e.target.closest('.react-aria-ComboBox input, [role="combobox"]') : null;
+      if (comboInp) {
+        var combo = comboInp.closest('.react-aria-ComboBox');
+        var btn = combo ? combo.querySelector('button') : null;
+        if (btn && comboInp.getAttribute('aria-expanded') === 'false') {
+          btn.click();
+        }
+      }
+    });
     
     on(inp, 'input', render);
     on(inp, 'keydown', function (e) {
@@ -394,8 +412,12 @@
 
     function handleKey(e) {
       var t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { 
+      var code = e.code || '';
+      var isK = (e.key === 'k' || e.key === 'K' || code === 'KeyK');
+      if ((e.ctrlKey || e.metaKey) && isK) { 
         e.preventDefault(); 
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         back.classList.contains('open') ? close() : open(); 
         return; 
       }
@@ -417,9 +439,9 @@
       }
     }
 
-    on(doc, 'keydown', handleKey);
-    on(host, 'keydown', handleKey);
-    window.addEventListener('keydown', handleKey);
+    on(doc, 'keydown', handleKey, { capture: true });
+    on(host, 'keydown', handleKey, { capture: true });
+    window.addEventListener('keydown', handleKey, { capture: true });
 
     /* ---------- Boot Sequence ---------- */
     decorate(); 

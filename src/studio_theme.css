@@ -82,22 +82,40 @@ html[data-tab="3"] { --a1: #34d399; --a2: #22d3ee; }   /* Tab 4 (Deploy): Emeral
   z-index: 1;
 }
 
+/* ---------- HEADER POINTER-EVENTS: Prevent transparent header from blocking clicks ---------- */
+header[data-testid="stHeader"] {
+  background: transparent !important;
+  pointer-events: none !important;
+  z-index: 999990 !important;
+}
+
+header[data-testid="stHeader"] * {
+  pointer-events: auto !important;
+}
+
 /* ---------- STICKY TABS: Always Accessible While Scrolling & Generating ---------- */
 .stTabs [role="tablist"],
 .stTabs [data-baseweb="tab-list"],
 [data-testid="stTabs"] [role="tablist"] {
   position: sticky !important;
-  top: 0 !important;
-  z-index: 9999 !important;
+  top: 3.85rem !important;
+  z-index: 999995 !important;
+  pointer-events: auto !important;
   background: rgba(14, 16, 24, 0.94) !important;
   backdrop-filter: blur(20px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 14px !important;
   padding: 6px 10px !important;
   margin-bottom: 1.2rem !important;
   box-shadow: 0 12px 36px -10px rgba(0, 0, 0, 0.85) !important;
   gap: 6px !important;
+}
+
+.stTabs [role="tablist"] *,
+.stTabs [data-baseweb="tab-list"] *,
+[data-testid="stTabs"] [role="tablist"] * {
+  pointer-events: auto !important;
 }
 
 .stTabs [data-baseweb="tab"],
@@ -199,6 +217,23 @@ section[data-testid="stSidebar"] .stButton > button {
   padding: 0 0.5rem !important;
   font-size: 0.82rem !important;
   white-space: nowrap !important;
+}
+
+/* Remove blinking vertical line/caret in dropdowns across the UI while preserving smooth click opening */
+.react-aria-ComboBox input,
+[role="combobox"],
+[data-rac] input,
+div[data-baseweb="select"] input {
+  caret-color: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+.react-aria-ComboBox,
+.react-aria-ComboBox [role="group"],
+.react-aria-ComboBox button,
+div[data-baseweb="select"] {
+  cursor: pointer !important;
 }
 
 /* ---------- Custom Interactive Cursor (Smooth & Reliable) ---------- */
