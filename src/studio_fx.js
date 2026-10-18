@@ -137,6 +137,27 @@
 
     /* ---------- Tab Dynamic Accent & Scroll Progress ---------- */
     function syncTab() {
+      var seg = doc.querySelector('[data-testid="stSegmentedControl"]');
+      if (seg) {
+        var btns = Array.prototype.slice.call(seg.querySelectorAll('button'));
+        btns.forEach(function (b, i) {
+          if (b.getAttribute('aria-checked') === 'true' || b.getAttribute('aria-selected') === 'true' || b.hasAttribute('data-active')) {
+            if (root.getAttribute('data-tab') !== String(i)) root.setAttribute('data-tab', String(i));
+          }
+        });
+        return;
+      }
+      var radioGroup = doc.querySelector('.st-key-nav_wrapper [role="radiogroup"], .st-key-hub_nav_radio [role="radiogroup"], .st-key-nav [role="radiogroup"]');
+      if (radioGroup) {
+        var labels = Array.prototype.slice.call(radioGroup.querySelectorAll('label'));
+        labels.forEach(function (l, i) {
+          var input = l.querySelector('input');
+          if (input && input.checked) {
+            if (root.getAttribute('data-tab') !== String(i)) root.setAttribute('data-tab', String(i));
+          }
+        });
+        return;
+      }
       var list = $('.stTabs [role="tablist"]'); 
       if (!list) return;
       var tabs = $$('[role="tab"]', list), idx = 0;
@@ -434,23 +455,22 @@
 
     /* ---------- Robust React Aria Tab Switching ---------- */
     function selectTab(idx) {
+      var segBtns = Array.from(doc.querySelectorAll('[data-testid="stSegmentedControl"] button'));
+      if (segBtns.length > idx) {
+        segBtns[idx].click();
+        return;
+      }
+      var radioLabels = Array.from(doc.querySelectorAll('.st-key-nav_wrapper [role="radiogroup"] label, .st-key-hub_nav_radio [role="radiogroup"] label, .st-key-nav [role="radiogroup"] label'));
+      if (radioLabels.length > idx) {
+        radioLabels[idx].click();
+        return;
+      }
       var tabList = doc.querySelector('.stTabs [role="tablist"], [data-testid="stTabs"] [role="tablist"]');
       var tabs = tabList ? Array.from(tabList.querySelectorAll('[role="tab"]')) : Array.from(doc.querySelectorAll('[data-testid="stTab"]'));
       if (!tabs.length) tabs = Array.from(doc.querySelectorAll('.stTabs [data-baseweb="tab"]'));
       var target = tabs[idx];
       if (!target) return;
-      target.focus();
-      try {
-        target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, view: host }));
-        target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: host }));
-        target.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, view: host }));
-        target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: host }));
-        target.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', keyCode: 32, bubbles: true }));
-        target.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space', keyCode: 32, bubbles: true }));
-        target.click();
-      } catch (err) {
-        target.click();
-      }
+      target.click();
     }
 
     /* ---------- Command Palette (Ctrl+K / Cmd+K) ---------- */

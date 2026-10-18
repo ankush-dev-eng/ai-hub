@@ -107,17 +107,157 @@ CSS = """
 [data-testid="stSidebar"]{background:var(--panel);border-right:1px solid var(--line)}
 .block-container{max-width:980px;padding-top:1rem;padding-bottom:7rem}
 
-/* ---- Sticky Glass Navigation (st.radio key="nav") ---- */
-.st-key-nav{position:sticky;top:3.75rem;z-index:100;padding:.45rem 0;
-  background:rgba(12,14,20,.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--line)}
-.st-key-nav [role="radiogroup"]{display:flex;flex-wrap:nowrap;gap:.35rem;overflow-x:auto}
-.st-key-nav label{margin:0;padding:.5rem .95rem;border-radius:10px;cursor:pointer;
-  color:var(--muted);white-space:nowrap;transition:background var(--ease),color var(--ease);font-size:0.92rem;font-weight:500}
-.st-key-nav label>div:first-child{display:none} /* hide radio dot */
-.st-key-nav label:hover{background:var(--accent-soft);color:var(--text)}
-.st-key-nav label:has(input:checked){background:var(--accent-soft);color:#fff;
-  box-shadow:inset 0 -2px 0 var(--accent)}
+/* ---- Full-Width Sticky Glass Segmented Navigation ---- */
+.st-key-nav_wrapper,
+[data-testid="stElementContainer"]:has(.st-key-nav_wrapper),
+[data-testid="stElementContainer"]:has(.st-key-hub_nav_segmented),
+[data-testid="stElementContainer"]:has(.st-key-hub_nav_radio),
+.st-key-nav,
+[data-testid="stElementContainer"]:has(.st-key-nav) {
+  position: sticky !important;
+  top: 3.75rem !important;
+  z-index: 990 !important;
+  width: 100% !important;
+  background: rgba(8, 9, 14, 0.95) !important;
+  backdrop-filter: blur(24px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 0.65rem 0 !important;
+  margin: 0 0 1.5rem 0 !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.75) !important;
+}
+
+/* 1. NATIVE st.segmented_control STYLING */
+div[data-testid="stSegmentedControl"],
+.st-key-hub_nav_segmented div[data-testid="stSegmentedControl"] {
+  max-width: 980px !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  background: rgba(18, 21, 31, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 16px !important;
+  padding: 4px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+div[data-testid="stSegmentedControl"] button {
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  padding: 0.55rem 1.35rem !important;
+  font-size: 0.92rem !important;
+  font-weight: 500 !important;
+  color: #94a3b8 !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  white-space: nowrap !important;
+}
+
+div[data-testid="stSegmentedControl"] button:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  transform: translateY(-1px) !important;
+}
+
+div[data-testid="stSegmentedControl"] button[aria-checked="true"],
+div[data-testid="stSegmentedControl"] button[aria-selected="true"],
+div[data-testid="stSegmentedControl"] button[data-active="true"] {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(34, 211, 238, 0.3)) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(99, 102, 241, 0.7) !important;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(0) !important;
+}
+
+/* 2. FALLBACK st.radio STYLING (Eradicates radio circles & raw outlines) */
+.st-key-nav_wrapper [role="radiogroup"],
+.st-key-hub_nav_radio [role="radiogroup"],
+.st-key-nav [role="radiogroup"] {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  max-width: 980px !important;
+  margin: 0 auto !important;
+  padding: 4px !important;
+  background: rgba(18, 21, 31, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 16px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+.st-key-nav_wrapper [role="radiogroup"] input[type="radio"],
+.st-key-nav_wrapper [role="radiogroup"] label > div:first-child,
+.st-key-nav_wrapper [role="radiogroup"] label svg,
+.st-key-nav_wrapper [data-baseweb="radio"] > div:first-child,
+.st-key-hub_nav_radio [role="radiogroup"] input[type="radio"],
+.st-key-hub_nav_radio [role="radiogroup"] label > div:first-child,
+.st-key-hub_nav_radio [role="radiogroup"] label svg,
+.st-key-hub_nav_radio [data-baseweb="radio"] > div:first-child,
+.st-key-nav [role="radiogroup"] input[type="radio"],
+.st-key-nav [role="radiogroup"] label > div:first-child,
+.st-key-nav [role="radiogroup"] label svg,
+.st-key-nav [data-baseweb="radio"] > div:first-child {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  position: absolute !important;
+  pointer-events: none !important;
+}
+
+.st-key-nav_wrapper [role="radiogroup"] label,
+.st-key-hub_nav_radio [role="radiogroup"] label,
+.st-key-nav [role="radiogroup"] label {
+  margin: 0 !important;
+  padding: 0.55rem 1.35rem !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  color: #94a3b8 !important;
+  white-space: nowrap !important;
+  border: 1px solid transparent !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  font-size: 0.92rem !important;
+  font-weight: 500 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  user-select: none !important;
+}
+
+.st-key-nav_wrapper [role="radiogroup"] label:hover,
+.st-key-hub_nav_radio [role="radiogroup"] label:hover,
+.st-key-nav [role="radiogroup"] label:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  transform: translateY(-1px) !important;
+}
+
+.st-key-nav_wrapper [role="radiogroup"] label:has(input:checked),
+.st-key-hub_nav_radio [role="radiogroup"] label:has(input:checked),
+.st-key-nav [role="radiogroup"] label:has(input:checked) {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(34, 211, 238, 0.3)) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(99, 102, 241, 0.7) !important;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(0) !important;
+}
+
+.st-key-nav_wrapper [role="radiogroup"] label:has(input:checked) *,
+.st-key-hub_nav_radio [role="radiogroup"] label:has(input:checked) *,
+.st-key-nav [role="radiogroup"] label:has(input:checked) * {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
 
 /* ---- Chat Messages ---- */
 [data-testid="stChatMessage"]{background:var(--panel);border:1px solid var(--line-soft);
@@ -228,10 +368,39 @@ def scroll_bottom():
     </script>""", height=0)
 
 # --------------------------------------------------------------------------- #
-# 3. Sticky Navigation
+# 3. Sticky Segmented Navigation
 # --------------------------------------------------------------------------- #
 def nav() -> str:
-    return st.radio("nav", NAV, horizontal=True, key="nav", label_visibility="collapsed")
+    if "nav_view" not in st.session_state or st.session_state.nav_view not in NAV:
+        st.session_state.nav_view = NAV[0]
+
+    with st.container(key="nav_wrapper"):
+        if hasattr(st, "segmented_control"):
+            chosen = st.segmented_control(
+                "Navigation",
+                NAV,
+                default=st.session_state.nav_view,
+                selection_mode="single",
+                required=True,
+                width="stretch",
+                label_visibility="collapsed",
+                key="hub_nav_segmented"
+            )
+            if chosen and chosen in NAV:
+                st.session_state.nav_view = chosen
+            return st.session_state.nav_view
+        else:
+            chosen = st.radio(
+                "Navigation",
+                NAV,
+                index=NAV.index(st.session_state.nav_view),
+                horizontal=True,
+                label_visibility="collapsed",
+                key="hub_nav_radio"
+            )
+            if chosen and chosen in NAV:
+                st.session_state.nav_view = chosen
+            return st.session_state.nav_view
 
 # --------------------------------------------------------------------------- #
 # 4. Model Selector with Official Logos & 2-Line Metadata Popover
