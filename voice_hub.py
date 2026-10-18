@@ -330,3 +330,18 @@ def make_speaker(cfg: dict, via_voice: bool = False):
     if cfg["mode"] == "Off" or (cfg["mode"] == MODES[0] and not via_voice):
         return NullSpeaker()
     return SentenceSpeaker(cfg)
+
+
+def prune_tts_cache(max_files: int = 200):
+    """Keep the TTS cache folder bounded."""
+    import pathlib
+    tts_dir = pathlib.Path(os.getenv("CHAT_DATA", "chat_data")) / "tts"
+    if not tts_dir.exists():
+        return
+    files = sorted(tts_dir.glob("*.mp3"), key=lambda f: f.stat().st_mtime, reverse=True)
+    for f in files[max_files:]:
+        try:
+            f.unlink(missing_ok=True)
+        except Exception:
+            pass
+

@@ -23,6 +23,8 @@ import streamlit as st
 from openai import OpenAI
 
 import voice_hub
+import history_ui as hui
+import history_db as hdb
 
 ENDPOINTS_FILE = pathlib.Path("endpoints.json")
 
@@ -379,14 +381,16 @@ def sidebar(reg: Dict[str, Any]):
 # --------------------------------------------------------------------------- #
 def render_chat():
     ss = st.session_state
+    hui.ensure_session()
     ss.setdefault("ch_hist", [])
-    ss.setdefault("session_id", f"session_{int(time.time())}")
+    ss.setdefault("session_id", ss.get("sid") or f"session_{int(time.time())}")
 
     reg = registry()
     if not reg:
         st.warning("⚠️ No AI provider connected. Please configure GROQ_API_KEY or GEMINI_API_KEY in `.env`, or connect a Colab endpoint in the sidebar.")
         return
 
+    hui.sidebar()
     prov, model, failover, search, use_rag, compare_mode, prov_b, model_b, system, temp = sidebar(reg)
     vcfg = voice_hub.sidebar()
 
@@ -450,8 +454,10 @@ def render_chat():
             rag_context, citations = query_rag_context(coll, user_text, top_k=3)
 
     # Append user message
-    display_content = user_text + (f"\n\n*(Attached {len(prompt.files)} files)*" if prompt.files and not user_text else "")
-    ss.ch_hist.append({"role": "user", "content": user_text + file_text, "images": imgs})
+    display_content = user_text or ("*(Attached files)*" if prompt.files else "")
+    full_content = user_text + file_text
+    hui.save_user(display_content, full_content, imgs)
+    ss.ch_hist.append({"role": "user", "content": full_content, "images": imgs})
 
     with st.chat_message("user"):
         st.markdown(user_text or "*(File attachments)*")
@@ -493,6 +499,8 @@ def render_chat():
             meta_a = f"{used_a} ({t_a:.2f}s)"
             meta_b = f"{used_b} ({t_b:.2f}s)"
 
+        meta_cmp = {"is_compare": True, "meta_a": meta_a, "meta_b": meta_b}
+        hui.save_assistant(f"**{meta_a}**:\n{text_a}\n\n**{meta_b}**:\n{text_b}", f"{prov} vs {prov_b}", meta_cmp)
         ss.ch_hist.append({
             "role": "assistant",
             "is_compare": True,
@@ -501,6 +509,8 @@ def render_chat():
             "meta_a": meta_a,
             "meta_b": meta_b,
         })
+        if len(ss.ch_hist) <= 2:
+            hui.start_title(reg, [(prov, model)], user_text)
         st.rerun()
 
     # Normal Single Streaming Inference with Failover
@@ -524,7 +534,11 @@ def render_chat():
                 for cit in citations:
                     st.markdown(f"- **{cit['source']}** (Chunk {cit['chunk']}): `{cit['text']}`")
 
+    meta = {"citations": citations} if citations else {}
+    hui.save_assistant(text, used, meta)
     ss.ch_hist.append({"role": "assistant", "content": text, "used": used, "citations": citations})
+    if len(ss.ch_hist) <= 2:
+        hui.start_title(reg, chain, user_text)
     st.rerun()
 
 

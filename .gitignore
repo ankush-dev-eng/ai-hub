@@ -24,4 +24,5 @@ saved_media/
 .pytest_cache/
 .system_generated/
 .colab_tunnel_cache.txt
+chat_data/
 
