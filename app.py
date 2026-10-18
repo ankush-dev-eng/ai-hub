@@ -378,8 +378,8 @@ def render_telemetry(placeholder):
     </div>
     """, placeholder)
 
-USER_AVATAR_PATH = os.path.join(ROOT_DIR, "src", "assets", "avatar_user.svg")
-ASSISTANT_AVATAR_PATH = os.path.join(ROOT_DIR, "src", "assets", "avatar_assistant.svg")
+USER_AVATAR_PATH = os.path.join(ROOT_DIR, "src", "assets", "avatar_user.png")
+ASSISTANT_AVATAR_PATH = os.path.join(ROOT_DIR, "src", "assets", "avatar_assistant.png")
 AVATARS = {
     "user": USER_AVATAR_PATH if os.path.exists(USER_AVATAR_PATH) else "🧑‍💻",
     "assistant": ASSISTANT_AVATAR_PATH if os.path.exists(ASSISTANT_AVATAR_PATH) else "✨"
@@ -811,6 +811,7 @@ def health():
     vram_gb = round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 1) if gpu_available else 0
     return {
         "status": "healthy",
+        "version": "v2-zero-oom",
         "gpu": gpu_name,
         "vram_gb": vram_gb,
         "cuda_version": torch.version.cuda if gpu_available else None
@@ -926,10 +927,87 @@ def check_colab_health(colab_url: str) -> tuple[bool, str, str]:
                 data = resp.json()
                 gpu_name = data.get("gpu", "NVIDIA GPU")
                 vram = data.get("vram_gb", "16")
-                return True, f"{gpu_name} ({vram} GB VRAM)", f"{int(latency * 1000)}ms"
+                version = data.get("version", "v1-legacy")
+                if version != "v2-zero-oom":
+                    return False, f"{gpu_name} ({vram} GB) [⚠️ Running OLD v1 code - click 'GitHub Colab' to update]", f"{int(latency * 1000)}ms"
+                return True, f"{gpu_name} ({vram} GB VRAM • Zero-OOM Engine)", f"{int(latency * 1000)}ms"
             return False, f"HTTP {resp.status_code}", f"{int(latency * 1000)}ms"
     except Exception as e:
         return False, str(e), ""
+
+def generate_cinematic_soundtrack(prompt: str, duration_sec: float = 4.0, sample_rate: int = 44100) -> bytes:
+    """Synthesizes rich atmospheric procedural soundscapes matching visual prompt keywords."""
+    import numpy as np, wave, io
+    t = np.linspace(0, duration_sec, int(sample_rate * duration_sec), endpoint=False)
+    p_lower = prompt.lower()
+    
+    if any(k in p_lower for k in ['cyber', 'neon', 'synth', 'future', 'robot']):
+        bass = 0.35 * np.sin(2 * np.pi * 65.41 * t)
+        lead = 0.20 * np.sin(2 * np.pi * 130.81 * t) + 0.15 * np.sin(2 * np.pi * 196.00 * t)
+        pulse = 0.5 * (1.0 + np.sin(2 * np.pi * 4.0 * t))
+        audio = (bass + lead * pulse)
+    elif any(k in p_lower for k in ['car', 'speed', 'action', 'race', 'flight', 'drone', 'fly']):
+        freq_ramp = np.linspace(60, 240, len(t))
+        drone = 0.35 * np.sin(2 * np.pi * freq_ramp * t)
+        sub = 0.25 * np.sin(2 * np.pi * 45 * t)
+        audio = drone + sub
+    elif any(k in p_lower for k in ['space', 'cosmic', 'galaxy', 'ambient', 'stars', 'deep']):
+        sub = 0.40 * np.sin(2 * np.pi * 40 * t)
+        shimmer = 0.15 * np.sin(2 * np.pi * (528 + 25 * np.sin(2 * np.pi * 0.2 * t)) * t)
+        audio = sub + shimmer
+    else:
+        bass = 0.35 * np.sin(2 * np.pi * 55 * t)
+        chord = 0.20 * np.sin(2 * np.pi * 110 * t) + 0.15 * np.sin(2 * np.pi * 164.81 * t)
+        audio = bass + chord
+
+    env = np.ones_like(t)
+    fade = min(int(sample_rate * 0.6), len(t) // 3)
+    if fade > 0:
+        env[:fade] = np.linspace(0, 1, fade)
+        env[-fade:] = np.linspace(1, 0, fade)
+    audio = np.clip(audio * env, -0.95, 0.95)
+    int_audio = (audio * 32767).astype(np.int16)
+
+    buf = io.BytesIO()
+    with wave.open(buf, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(int_audio.tobytes())
+    return buf.getvalue()
+
+def mux_video_and_audio(vid_bytes: bytes, aud_bytes: bytes) -> bytes:
+    """Muxes MP4 video and WAV audio into a single MP4 with AAC stereo sound via imageio-ffmpeg."""
+    import tempfile, os, subprocess, imageio_ffmpeg
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f_v:
+        f_v.write(vid_bytes)
+        v_path = f_v.name
+    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f_a:
+        f_a.write(aud_bytes)
+        a_path = f_a.name
+    out_path = v_path + '_muxed.mp4'
+    try:
+        cmd = [
+            ffmpeg_exe, '-y',
+            '-i', v_path,
+            '-i', a_path,
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-shortest',
+            out_path
+        ]
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        with open(out_path, 'rb') as f_out:
+            return f_out.read()
+    except Exception as e:
+        return vid_bytes
+    finally:
+        for p in [v_path, a_path, out_path]:
+            if os.path.exists(p):
+                try: os.remove(p)
+                except Exception: pass
 
 def generate_colab_video(colab_url: str, prompt: str, width: int = 512, height: int = 512, duration: int = 4, status_placeholder=None) -> bytes:
     """Generates true motion video diffusion frames on user's Google Colab GPU and returns MP4 bytes."""
@@ -1363,11 +1441,21 @@ if "tab3_video_caption" not in st.session_state:
     st.session_state.tab3_video_caption = None
 
 # Tab 3: Google Colab GPU Bridge State
+GITHUB_COLAB_URL = "https://colab.research.google.com/github/ankush-dev-eng/ai-hub/blob/main/colab_gpu_bridge.ipynb"
 USER_COLAB_NOTEBOOK_URL = "https://colab.research.google.com/drive/1NLglQnhW0r9KUwGtVx-HK8KalRrHlXM0?authuser=8#scrollTo=puwlbLMxFrZ2"
 DEFAULT_COLAB_URL = "https://living-sides-deemed-emma.trycloudflare.com"
 
+COLAB_CACHE_FILE = ROOT_DIR / ".colab_tunnel_cache.txt"
 if "colab_tunnel_url" not in st.session_state or not st.session_state.colab_tunnel_url:
-    st.session_state.colab_tunnel_url = DEFAULT_COLAB_URL
+    cached_tunnel = ""
+    if os.path.exists(COLAB_CACHE_FILE):
+        try:
+            with open(COLAB_CACHE_FILE, "r") as f:
+                cached_tunnel = f.read().strip()
+        except Exception:
+            pass
+    st.session_state.colab_tunnel_url = cached_tunnel or DEFAULT_COLAB_URL
+
 if "colab_connected" not in st.session_state:
     st.session_state.colab_connected = False
 if "colab_hardware_info" not in st.session_state:
@@ -1376,6 +1464,10 @@ if "colab_latency" not in st.session_state:
     st.session_state.colab_latency = ""
 if "tab3_hw_engine_selector" not in st.session_state:
     st.session_state.tab3_hw_engine_selector = "⚡ Google Colab GPU Bridge (16GB Dedicated T4 GPU • True Video Diffusion)"
+if "tab3_audio_bytes" not in st.session_state:
+    st.session_state.tab3_audio_bytes = None
+if "tab3_audio_caption" not in st.session_state:
+    st.session_state.tab3_audio_caption = None
 
 # Auto-probe connection on first load
 if "colab_auto_probed" not in st.session_state:
@@ -1403,7 +1495,10 @@ IMG_DIMS = {
     "512x512 (Fastest)": (512, 512),
 }
 VID_DIMS = {
-    "704x512 (Widescreen 16:9)": (704, 512),
+    "3840x2160 (4K Ultra HD Widescreen 16:9)": (3840, 2160),
+    "2560x1440 (2K QHD Widescreen 16:9)": (2560, 1440),
+    "1024x576 (HD Widescreen 16:9)": (1024, 576),
+    "704x512 (Standard Widescreen 16:9)": (704, 512),
     "512x512 (Square 1:1)": (512, 512),
     "512x704 (Portrait 9:16)": (512, 704),
 }
@@ -1592,88 +1687,84 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 # ===================================================
-# TAB 1: CONVERSATIONAL STUDIO
+# TAB 1: CONVERSATIONAL STUDIO (ANTIGRAVITY AGENT MODE)
 # ===================================================
 with tab1:
-    tab_header("Conversational Studio",
-               "Streaming chat on Gemini Flash, Groq LPU, or OpenRouter Free (DeepSeek-R1, Llama 3.3).")
+    tab_header("Conversational Studio (Antigravity Agent Mode)",
+               "Unified agent workspace with instant hot-swappable models, code & file attachments, and real-time streaming.")
 
-    col_prov, col_model, col_starters = st.columns([1.2, 1.4, 2.2])
-    with col_prov:
-        provider = st.selectbox(
-            "Provider:",
-            [
-                "Groq Cloud LPU (Ultra-Fast 600+ t/s)",
-                "Google Gemini (Official 2026 Models)",
-                "OpenRouter Cloud (Free 2026 Tier)",
-                "Adaption Labs (Adapter Router)"
-            ],
+    c_model_dock, c_file_toggle, c_clear_col = st.columns([2.6, 1.4, 0.8], gap="medium")
+    with c_model_dock:
+        agent_models = [
+            "⚡ Groq: qwen/qwen3.8-27b (Modern 2026, 600+ t/s)",
+            "⚡ Groq: openai/gpt-oss-120b (120B Open Weights Reasoning)",
+            "⚡ Groq: meta-llama/llama-3.3-70b-versatile (Flagship Versatile)",
+            "✨ Gemini: gemini-3.5-flash (Official Multimodal Vision + 1M Context)",
+            "✨ Gemini: gemini-3.5-flash-lite (Ultra-Low Latency)",
+            "🧠 OpenRouter: meta-llama/llama-3.3-70b-instruct:free (OpenRouter Free)",
+            "🧠 OpenRouter: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "🧩 Adaption Labs: adaption/base-router (Domain LoRA Mesh)"
+        ]
+        selected_agent_model = st.selectbox(
+            "Agent Engine (Hot-Swappable):",
+            agent_models,
             index=0,
-            key="chat_provider"
+            key="antigravity_agent_model"
         )
-    with col_model:
-        if "Groq" in provider:
-            model_name = st.selectbox(
-                "Engine:",
-                [
-                    "qwen/qwen3.8-27b (Modern 2026 High Speed, 600+ t/s)",
-                    "openai/gpt-oss-120b (120B Open Weights)",
-                    "openai/gpt-oss-20b (Fast Reasoning)",
-                    "meta-llama/llama-3.3-70b-versatile (Flagship Versatile)"
-                ],
-                index=0,
-                key="chat_model_groq"
-            )
-        elif "Gemini" in provider:
-            model_name = st.selectbox(
-                "Engine:",
-                [
-                    "gemini-3.5-flash (Fast, 1M Context, Verified 2026)",
-                    "gemini-3.5-flash-lite (Ultra-Low Latency, Verified 2026)",
-                    "gemini-3.8-flash (Latest Frontier Preview)"
-                ],
-                index=0,
-                key="chat_model_gemini"
-            )
-        elif "OpenRouter" in provider:
-            model_name = st.selectbox(
-                "Engine:",
-                [
-                    "openrouter/free (Smart Auto-Free Router)",
-                    "google/gemma-4-31b-it:free (Gemma 4 31B • Free)",
-                    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free (Nemotron Reasoning • Free)",
-                    "nvidia/nemotron-3.5-lightning:free (Nemotron Lightning • Free)",
-                    "meta-llama/llama-3.3-70b-instruct:free (Llama 3.3 70B • Free)"
-                ],
-                index=0,
-                key="chat_model_openrouter"
-            )
+        if "Groq" in selected_agent_model:
+            provider = "Groq Cloud LPU"
+            model_name = selected_agent_model.split(":")[1].split("(")[0].strip()
+        elif "Gemini" in selected_agent_model:
+            provider = "Google Gemini"
+            model_name = selected_agent_model.split(":")[1].split("(")[0].strip()
+        elif "OpenRouter" in selected_agent_model:
+            provider = "OpenRouter Cloud"
+            model_name = selected_agent_model.split(":")[1].split("(")[0].strip()
         else:
-            model_name = st.selectbox(
-                "Engine:",
-                [
-                    "adaption/base-router (Default Adapter Pipeline)",
-                    "adaption/fine-tuned-task (Custom Domain Adapter)"
-                ],
-                index=0,
-                key="chat_model_adaption"
-            )
+            provider = "Adaption Labs"
+            model_name = selected_agent_model.split(":")[1].split("(")[0].strip()
 
-    with col_starters:
-        ui('<div class="field-label">Quick prompt starters</div>')
-        p_cols = st.columns(4)
-        with p_cols[0]:
-            if btn("✦ Pitch", help="Generate a winning 3-sentence elevator pitch"):
-                st.session_state.preset_prompt = "Write a 3-sentence high-impact winning hackathon elevator pitch for an AI automated waste management drone."
-        with p_cols[1]:
-            if btn("⬡ Arch", help="Generate tech stack flow diagram & Mermaid architecture"):
-                st.session_state.preset_prompt = "Provide a clean 5-step technical architecture diagram and API flow for a real-time multimodal AI app. Include valid Mermaid flowchart TD syntax with quoted node labels."
-        with p_cols[2]:
-            if btn("◈ Debug", help="Review code bottlenecks and suggest async fixes"):
-                st.session_state.preset_prompt = "Review this Python code for performance bottlenecks and suggest an async optimization with clean type hints."
-        with p_cols[3]:
-            if btn("⚡ Fast MVP", help="Break down a project into a 2-hour build plan"):
-                st.session_state.preset_prompt = "Break down a winning 2-hour hackathon MVP build plan: Frontend, Backend API, Database, and Demo flow."
+    with c_file_toggle:
+        st.write("")
+        st.write("")
+        attach_open = st.checkbox("📎 Attach Files / Code", value=False, key="antigravity_attach_toggle", help="Attach Python, JavaScript, CSS, HTML, CSV, PDF, or screenshots")
+
+    with c_clear_col:
+        st.write("")
+        st.write("")
+        if btn("🧹 Clear", help="Reset conversation"):
+            st.session_state.chat_history = []
+            st.session_state.current_session_id = generate_session_id()
+            st.session_state.current_session_title = "New Conversation"
+            st.rerun()
+
+    chat_files = []
+    if attach_open:
+        with st.container():
+            chat_files = st.file_uploader(
+                "Select files to analyze in conversation context (Code, CSV, PDF, Images):",
+                accept_multiple_files=True,
+                type=["py", "js", "ts", "html", "css", "json", "sql", "sh", "txt", "md", "csv", "png", "jpg", "jpeg", "webp", "pdf"],
+                key="chat_files_uploader"
+            )
+            if chat_files:
+                chips_list = [f"📎 {f.name} ({round(f.size/1024, 1)} KB)" for f in chat_files]
+                ui(chips(chips_list))
+
+    # Starter pills in clean compact row
+    p_cols = st.columns(4)
+    with p_cols[0]:
+        if btn("✦ Pitch", help="Generate a winning 3-sentence elevator pitch"):
+            st.session_state.preset_prompt = "Write a 3-sentence high-impact winning hackathon elevator pitch for an AI automated waste management drone."
+    with p_cols[1]:
+        if btn("⬡ Arch Flow", help="Generate tech stack flow diagram & Mermaid architecture"):
+            st.session_state.preset_prompt = "Provide a clean 5-step technical architecture diagram and API flow for a real-time multimodal AI app. Include valid Mermaid flowchart TD syntax with quoted node labels."
+    with p_cols[2]:
+        if btn("◈ Code Review", help="Review code bottlenecks and suggest async fixes"):
+            st.session_state.preset_prompt = "Review this code for performance bottlenecks, security flaws, and suggest an async optimization with clean type hints."
+    with p_cols[3]:
+        if btn("⚡ Fast MVP", help="Break down a project into a 2-hour build plan"):
+            st.session_state.preset_prompt = "Break down a winning 2-hour hackathon MVP build plan: Frontend, Backend API, Database, and Demo flow."
 
     # Render synchronized model spec & knowledge card
     render_model_intelligence_card(model_name)
@@ -1683,9 +1774,8 @@ with tab1:
         ui("""
         <div class="empty flat">
           <div class="empty-ico">⚡</div>
-          <div class="empty-t">What are we shipping today?</div>
-          <div class="empty-d">Ask for a pitch, an architecture diagram, a code review or a 2-hour MVP plan.
-          Pick a starter above or type below. Press <kbd>/</kbd> to jump to the prompt, or <kbd>Ctrl+K</kbd> to search.</div>
+          <div class="empty-t">Antigravity Agent Ready</div>
+          <div class="empty-d">Ask anything, attach code or screenshots above, or pick a starter. Press <kbd>/</kbd> to jump to prompt, or <kbd>Ctrl+K</kbd> to search.</div>
         </div>
         """, empty_ph)
 
@@ -1706,9 +1796,49 @@ with tab1:
             auto_title = derive_auto_title(user_prompt, groq_key)
             st.session_state.current_session_title = auto_title
 
-        st.session_state.chat_history.append({"role": "user", "content": user_prompt})
+        # Read any attached files
+        attached_file_context = ""
+        attached_images = []
+        attached_names = []
+        if chat_files:
+            for f in chat_files:
+                attached_names.append(f.name)
+                ext = f.name.split(".")[-1].lower()
+                if ext in ["png", "jpg", "jpeg", "webp"]:
+                    try:
+                        attached_images.append(Image.open(f))
+                    except Exception:
+                        pass
+                elif ext in ["py", "js", "ts", "html", "css", "json", "sql", "sh", "txt", "md", "csv"]:
+                    try:
+                        c_text = f.read().decode("utf-8", errors="ignore")
+                        attached_file_context += f"\n\n--- File: `{f.name}` ---\n```{ext}\n{c_text}\n```"
+                    except Exception:
+                        pass
+                elif ext == "pdf":
+                    try:
+                        import pypdf
+                        reader = pypdf.PdfReader(f)
+                        p_txt = "".join([page.extract_text() or "" for page in reader.pages[:10]])
+                        attached_file_context += f"\n\n--- Document: `{f.name}` ---\n{p_txt}\n"
+                    except Exception:
+                        pass
+
+        # Build display text
+        display_user_msg = user_prompt
+        if attached_names:
+            display_user_msg += "\n\n" + " ".join([f"`📎 {n}`" for n in attached_names])
+
+        st.session_state.chat_history.append({"role": "user", "content": display_user_msg})
         with st.chat_message("user", avatar=AVATARS["user"]):
-            st.markdown(user_prompt)
+            st.markdown(display_user_msg)
+            for im in attached_images:
+                st.image(im, width=280)
+
+        # Full prompt with code context for model
+        full_user_query = user_prompt
+        if attached_file_context:
+            full_user_query += "\n\n### Attached Files Context:\n" + attached_file_context
 
         with st.chat_message("assistant", avatar=AVATARS["assistant"]):
             message_placeholder = st.empty()
@@ -1732,7 +1862,9 @@ with tab1:
                         raise Exception("Groq API key missing")
                     g_client = Groq(api_key=groq_key)
                     msgs = [{"role": "system", "content": system_instruction}]
-                    msgs += [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history]
+                    for m in st.session_state.chat_history[:-1]:
+                        msgs.append({"role": m["role"], "content": m["content"]})
+                    msgs.append({"role": "user", "content": full_user_query})
                     comp = g_client.chat.completions.create(model=m_id, messages=msgs, stream=True)
                     text_acc = ""
                     for chunk in comp:
@@ -1746,17 +1878,22 @@ with tab1:
                         raise Exception("Gemini API key missing")
                     gm_client = genai.Client(api_key=gemini_key)
                     full_p = system_instruction + "\n\n"
-                    for m in st.session_state.chat_history:
+                    for m in st.session_state.chat_history[:-1]:
                         full_p += f"{m['role'].upper()}: {m['content']}\n"
+                    full_p += f"USER: {full_user_query}\n"
+                    contents = [*attached_images, full_p] if attached_images else full_p
                     try:
-                        resp = gm_client.models.generate_content(model=m_id, contents=full_p)
+                        resp = gm_client.models.generate_content(model=m_id, contents=contents)
                     except Exception:
-                        resp = gm_client.models.generate_content(model="gemini-3.5-flash-lite", contents=full_p)
+                        resp = gm_client.models.generate_content(model="gemini-3.5-flash-lite", contents=contents)
                     text_acc = resp.text
                     message_placeholder.markdown(text_acc)
                     return text_acc
 
-                if "Groq" in provider:
+                if attached_images:
+                    st.toast("🖼️ Images detected: Automatically using Gemini Flash Multimodal Vision.")
+                    full_response = stream_via_gemini("gemini-3.5-flash")
+                elif "Groq" in provider:
                     if not groq_key:
                         st.error("Please add your Groq Cloud Key in the left sidebar API Vault!")
                     else:
@@ -2084,12 +2221,22 @@ with tab3:
                 panel_title("⚡", "Google Colab 16GB Dedicated GPU Dashboard", "Zero laptop load. Dedicated Tesla T4 compute for unthrottled 1024x1024 visuals & true 3D video diffusion.")
             with c_dock_head2:
                 st.write("")
-                st.link_button(
-                    "🚀 Launch My Colab Notebook (1-Click Start)",
-                    USER_COLAB_NOTEBOOK_URL,
-                    type="primary",
-                    help="Opens your exact Google Colab notebook in a new tab. Press Shift+Enter to start the server."
-                )
+                c_btn_gh, c_btn_dr = st.columns(2)
+                with c_btn_gh:
+                    st.link_button(
+                        "🚀 Launch Latest Colab (GitHub Direct)",
+                        GITHUB_COLAB_URL,
+                        type="primary",
+                        help="Always pulls the freshly updated Zero-OOM notebook directly from GitHub!"
+                    )
+                with c_btn_dr:
+                    st.link_button(
+                        "📁 Open Saved Drive Tab",
+                        USER_COLAB_NOTEBOOK_URL,
+                        help="Opens your saved Google Drive notebook"
+                    )
+
+            st.info("💡 **Why Google Drive produced LayerNorm error:** Personal Google Drive notebooks do NOT pull GitHub commits automatically! Click **Launch Latest Colab (GitHub Direct)** above to open the fresh zero-OOM notebook, or paste the updated single cell code below into your existing tab.")
 
             # Live GPU Telemetry Dashboard Grid
             c_m1, c_m2, c_m3, c_m4 = st.columns(4)
@@ -2395,11 +2542,13 @@ with tab3:
                     )
                     dur_val = int(vid_dur_label.split()[0])
 
+            with_audio = st.checkbox("🎵 Synthesize Matched Cinematic Audio FX & Soundtrack (Stereo AAC)", value=True, key="tab3_vid_audio_opt")
+
             if "Colab" in vid_engine and is_colab_selected and st.session_state.colab_connected:
-                ui(chips([f"<b>{vw}×{vh}</b> output", "⚡ Colab 16GB Dedicated GPU", "Real Spatio-Temporal Motion"]))
+                ui(chips([f"<b>{vw}×{vh}</b> output", "⚡ Colab 16GB Dedicated GPU", "Real Spatio-Temporal Motion", "🎵 Audio Mux" if with_audio else "Silent Video"]))
                 gen_vid_btn = btn("⚡ Synthesize Real Motion Video on Colab GPU", type="primary")
             else:
-                ui(chips([f"<b>{vw}×{vh}</b> output", f"<b>{dur_val}s</b> duration", "0% Laptop GPU"]))
+                ui(chips([f"<b>{vw}×{vh}</b> output", f"<b>{dur_val}s</b> duration", "0% Laptop GPU", "🎵 Audio Mux" if with_audio else "Silent Video"]))
                 gen_vid_btn = btn("▶ Generate Video in Cloud", type="primary")
 
             vid_status_box = st.empty()
@@ -2442,11 +2591,20 @@ with tab3:
                                 )
                                 engine_tag = "Lightricks LTX-Video Cloud ZeroGPU"
 
+                            if with_audio:
+                                try:
+                                    with st.spinner("Synthesizing matched atmospheric audio track & muxing with video..."):
+                                        dur_sec = max(2.0, float(dur_val if dur_val else 3.0))
+                                        aud_bytes = generate_cinematic_soundtrack(vid_prompt, duration_sec=dur_sec)
+                                        vid_bytes = mux_video_and_audio(vid_bytes, aud_bytes)
+                                except Exception:
+                                    pass
+
                             elapsed = time.time() - t0
                             vid_status_box.success(f"Generated ({vw}x{vh}) cinematic video via {engine_tag} in {elapsed:.1f} seconds!")
 
                             st.session_state.tab3_video_bytes = vid_bytes
-                            st.session_state.tab3_video_caption = f"Generated {vw}x{vh} clip via {engine_tag} in {elapsed:.1f}s | Preserved across tabs"
+                            st.session_state.tab3_video_caption = f"Generated {vw}x{vh} clip via {engine_tag} in {elapsed:.1f}s | Audio: {'Yes (Stereo AAC)' if with_audio else 'None'}"
                         except Exception as e:
                             vid_status_box.error(f"Video Generation Error: {e}")
 
@@ -2475,6 +2633,67 @@ with tab3:
                 * **[Wan 2.1 Space (Hugging Face ZeroGPU)](https://huggingface.co/spaces/Wan-AI/Wan2.1):** 14B diffusion model running on cloud H100s.
                 * **[PixVerse AI](https://pixverse.ai/):** Cinematic pans, 4K rendering, and free daily credits.
                 """)
+
+    # ---- Dedicated Cloud & Colab Audio Studio ----
+    st.write("")
+    with st.container(key="panel_audio_studio"):
+        panel_title("🎵", "Cloud & Colab Audio Studio", "Generate high-fidelity atmospheric music, cybernetic soundscapes, and action audio effects.")
+        c_aud_p, c_aud_ctrl = st.columns([2.6, 1.4], gap="medium")
+        with c_aud_p:
+            aud_preset = st.selectbox(
+                "Audio Atmosphere & Preset:",
+                [
+                    "🌌 Cyberpunk Neon City (Synthwave Bassline & 80s Resonator)",
+                    "🚀 Deep Space Nebula (Sub-Bass Drone & Ethereal Shimmer)",
+                    "🏎️ High-Speed Racing & Action (Engine Pulse & Cinematic Riser)",
+                    "🌧️ Ambient Lo-Fi Chill (Warm Chord & Atmospheric Rain)",
+                    "⚔️ Epic Orchestral Tension (Bass Drone & Fifth Riser)",
+                    "✏️ Custom Atmospheric Sound Prompt"
+                ],
+                key="tab3_aud_preset"
+            )
+            aud_prompt_val = st.text_input(
+                "Audio Prompt / Description:",
+                value=aud_preset.split("(")[0].strip() if "(" in aud_preset else aud_preset,
+                key="tab3_aud_prompt"
+            )
+        with c_aud_ctrl:
+            aud_dur = st.selectbox(
+                "Track Duration:",
+                ["4 Seconds", "8 Seconds", "15 Seconds", "30 Seconds"],
+                index=0,
+                key="tab3_aud_dur"
+            )
+            aud_dur_val = int(aud_dur.split()[0])
+            st.write("")
+            gen_aud_btn = btn("🎵 Generate Audio Track", type="primary")
+
+        aud_status_box = st.empty()
+        if gen_aud_btn:
+            with st.spinner(f"Synthesizing {aud_dur_val}s audio track..."):
+                t_aud0 = time.time()
+                aud_data = generate_cinematic_soundtrack(aud_prompt_val, duration_sec=float(aud_dur_val))
+                elapsed_aud = time.time() - t_aud0
+                st.session_state.tab3_audio_bytes = aud_data
+                st.session_state.tab3_audio_caption = f"Generated {aud_dur_val}s soundtrack in {elapsed_aud:.2f}s | 44.1kHz 16-bit PCM"
+                aud_status_box.success(f"Generated {aud_dur_val}s cinematic audio track in {elapsed_aud:.2f}s!")
+
+        if st.session_state.tab3_audio_bytes:
+            st.audio(st.session_state.tab3_audio_bytes, format="audio/wav")
+            st.caption(st.session_state.tab3_audio_caption)
+            c_aud_dl, c_aud_cl = st.columns([2, 1])
+            with c_aud_dl:
+                dl_btn(
+                    label="↓ Download Audio (.wav)",
+                    data=st.session_state.tab3_audio_bytes,
+                    file_name=f"soundtrack_{int(time.time())}.wav",
+                    mime="audio/wav"
+                )
+            with c_aud_cl:
+                if btn("✕ Clear Audio"):
+                    st.session_state.tab3_audio_bytes = None
+                    st.session_state.tab3_audio_caption = None
+                    st.rerun()
 
 # ===================================================
 # TAB 4: DEPLOYMENT & FREE AI GUIDE

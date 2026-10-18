@@ -1129,12 +1129,17 @@ div[data-testid="stRadio"]:has(input[name*="tab3_hw_engine_selector"]) label:hov
   box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.85) !important;
 }
 
-/* Figma-style rounded avatar frames */
+/* Figma-style rounded avatar frames - STRICTLY LOCKED TO 36px */
 [data-testid="stChatMessageAvatar"],
-[data-testid="stChatMessage"] > div:first-child {
-  border-radius: 12px !important;
-  width: 38px !important;
-  height: 38px !important;
+.stChatMessage [data-testid="stChatMessageAvatar"],
+div[data-testid="stChatMessageAvatar"] {
+  border-radius: 10px !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
   overflow: hidden !important;
   background: rgba(12, 15, 24, 0.95) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.12) !important;
@@ -1142,14 +1147,24 @@ div[data-testid="stRadio"]:has(input[name*="tab3_hw_engine_selector"]) label:hov
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  flex-shrink: 0 !important;
+  flex: 0 0 36px !important;
 }
 
 [data-testid="stChatMessageAvatar"] img,
-[data-testid="stChatMessage"] img {
-  width: 100% !important;
-  height: 100% !important;
+[data-testid="stChatMessageAvatar"] svg,
+.stChatMessage [data-testid="stChatMessageAvatar"] img,
+.stChatMessage [data-testid="stChatMessageAvatar"] svg,
+img[src*="avatar_user"],
+img[src*="avatar_assistant"] {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  border-radius: 8px !important;
   object-fit: cover !important;
+  display: block !important;
 }
 
 /* Floating Figma Bottom Chat Input Bar */
