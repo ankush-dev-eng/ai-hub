@@ -220,11 +220,7 @@ section[data-testid="stSidebar"] .stButton > button {
   white-space: nowrap !important;
 }
 
-/* Remove blinking vertical line/caret across ALL dropdowns, comboboxes, and select boxes */
-.react-aria-ComboBox input,
-[role="combobox"],
-[role="combobox"] input,
-[data-rac] input,
+/* Remove blinking vertical line/caret ONLY on dropdown select boxes */
 div[data-baseweb="select"] input,
 [data-testid="stSelectbox"] input,
 .stSelectbox input {
@@ -233,9 +229,18 @@ div[data-baseweb="select"] input,
   user-select: none !important;
 }
 
-.react-aria-ComboBox,
-.react-aria-ComboBox [role="group"],
-.react-aria-ComboBox button,
+/* Explicitly guarantee text inputs and textareas allow typing, caret, selection, and clipboard paste */
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea,
+.stTextInput input,
+.stTextArea textarea {
+  caret-color: #22d3ee !important;
+  cursor: text !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  pointer-events: auto !important;
+}
+
 div[data-baseweb="select"],
 [data-testid="stSelectbox"],
 .stSelectbox {

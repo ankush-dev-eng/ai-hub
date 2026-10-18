@@ -194,12 +194,21 @@
       $$(CARD).forEach(function (n) { 
         if (!n.classList.contains('fx-card')) n.classList.add('fx-card'); 
       });
-      $$('.react-aria-ComboBox input, [role="combobox"], [data-rac] input, select, div[data-baseweb="select"] input, [data-testid="stSelectbox"] input').forEach(function (i) { 
-        if (i.tagName === 'INPUT') { 
+      $$('div[data-baseweb="select"] input, [data-testid="stSelectbox"] input, .stSelectbox input, .react-aria-ComboBox input').forEach(function (i) { 
+        if (i.tagName === 'INPUT' && !i.closest('[data-testid="stTextInput"],[data-testid="stTextArea"],.stTextInput,.stTextArea')) { 
           i.style.caretColor = 'transparent'; 
           i.style.cursor = 'pointer'; 
           i.setAttribute('readonly', 'readonly');
         } 
+      });
+      // Explicitly guarantee all text inputs and textareas allow full paste, typing, and selection
+      $$('[data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea, .stTextInput input, .stTextArea textarea').forEach(function (i) {
+        if (i.hasAttribute('readonly') && !i.dataset.keepReadonly) {
+          i.removeAttribute('readonly');
+        }
+        i.style.caretColor = '#22d3ee';
+        i.style.cursor = 'text';
+        i.style.userSelect = 'text';
       });
       enhanceChecklists();
     }

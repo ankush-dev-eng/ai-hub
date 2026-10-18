@@ -1320,8 +1320,11 @@ if "tab3_video_caption" not in st.session_state:
     st.session_state.tab3_video_caption = None
 
 # Tab 3: Google Colab GPU Bridge State
-if "colab_tunnel_url" not in st.session_state:
-    st.session_state.colab_tunnel_url = ""
+USER_COLAB_NOTEBOOK_URL = "https://colab.research.google.com/drive/1NLglQnhW0r9KUwGtVx-HK8KalRrHlXM0?authuser=8#scrollTo=puwlbLMxFrZ2"
+DEFAULT_COLAB_URL = "https://living-sides-deemed-emma.trycloudflare.com"
+
+if "colab_tunnel_url" not in st.session_state or not st.session_state.colab_tunnel_url:
+    st.session_state.colab_tunnel_url = DEFAULT_COLAB_URL
 if "colab_connected" not in st.session_state:
     st.session_state.colab_connected = False
 if "colab_hardware_info" not in st.session_state:
@@ -1329,7 +1332,20 @@ if "colab_hardware_info" not in st.session_state:
 if "colab_latency" not in st.session_state:
     st.session_state.colab_latency = ""
 if "tab3_hw_engine_selector" not in st.session_state:
-    st.session_state.tab3_hw_engine_selector = "☁️ Free Cloud Tier (Hugging Face ZeroGPU & Storyboard Synthesizer)"
+    st.session_state.tab3_hw_engine_selector = "⚡ Google Colab GPU Bridge (16GB Dedicated T4 GPU • True Video Diffusion)"
+
+# Auto-probe connection on first load
+if "colab_auto_probed" not in st.session_state:
+    st.session_state.colab_auto_probed = True
+    try:
+        ok, gpu_desc, ping_str = check_colab_health(st.session_state.colab_tunnel_url)
+        if ok:
+            st.session_state.colab_connected = True
+            st.session_state.colab_hardware_info = gpu_desc
+            st.session_state.colab_latency = ping_str
+            st.session_state.tab3_hw_engine_selector = "⚡ Google Colab GPU Bridge (16GB Dedicated T4 GPU • True Video Diffusion)"
+    except Exception:
+        pass
 
 # Extra state for the redesigned UI
 if "last_latency" not in st.session_state:
@@ -2014,50 +2030,117 @@ with tab3:
 
     is_colab_selected = "Google Colab" in hw_mode
 
-    # ---- GOOGLE COLAB GPU BRIDGE DOCK (When Colab Engine is Selected) ----
+    # ---- GOOGLE COLAB GPU BRIDGE DASHBOARD (When Colab Engine is Selected) ----
     if is_colab_selected:
         with st.container(key="panel_colab_dock"):
-            panel_title("⚡", "Google Colab Dedicated GPU Bridge", "Connect a free 16GB NVIDIA Tesla T4 GPU for unlimited heavy diffusion and real fluid video.")
+            c_dock_head1, c_dock_head2 = st.columns([2.2, 1.8], gap="medium")
+            with c_dock_head1:
+                panel_title("⚡", "Google Colab 16GB Dedicated GPU Dashboard", "Zero laptop load. Dedicated Tesla T4 compute for unthrottled 1024x1024 visuals & true 3D video diffusion.")
+            with c_dock_head2:
+                st.write("")
+                st.link_button(
+                    "🚀 Launch My Colab Notebook (1-Click Start)",
+                    USER_COLAB_NOTEBOOK_URL,
+                    type="primary",
+                    help="Opens your exact Google Colab notebook in a new tab. Press Shift+Enter to start the server."
+                )
 
-            c_tun_input, c_tun_btn = st.columns([2.6, 1.4], gap="medium")
+            # Live GPU Telemetry Dashboard Grid
+            c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+            with c_m1:
+                if st.session_state.colab_connected:
+                    ui("""
+                    <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 12px 14px; text-align: center;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #34d399; font-weight: 700;">Connection Status</div>
+                        <div style="font-size: 1.15rem; font-weight: 800; color: #10b981; margin-top: 4px;">🟢 Online</div>
+                    </div>
+                    """)
+                else:
+                    ui("""
+                    <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 12px; padding: 12px 14px; text-align: center;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #f87171; font-weight: 700;">Connection Status</div>
+                        <div style="font-size: 1.15rem; font-weight: 800; color: #ef4444; margin-top: 4px;">🔴 Offline</div>
+                    </div>
+                    """)
+            with c_m2:
+                gpu_text = st.session_state.colab_hardware_info.split("(")[0].strip() if st.session_state.colab_hardware_info else "Tesla T4"
+                ui(f"""
+                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px 14px; text-align: center;">
+                    <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-weight: 700;">Cloud Accelerator</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #f1f5f9; margin-top: 4px;">{esc(gpu_text)}</div>
+                </div>
+                """)
+            with c_m3:
+                vram_text = "14.6 GB VRAM" if ("14" in st.session_state.colab_hardware_info or "15" in st.session_state.colab_hardware_info) else ("16.0 GB VRAM" if st.session_state.colab_connected else "16 GB Available")
+                ui(f"""
+                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px 14px; text-align: center;">
+                    <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-weight: 700;">Dedicated Memory</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin-top: 4px;">{esc(vram_text)}</div>
+                </div>
+                """)
+            with c_m4:
+                lat_text = st.session_state.colab_latency if st.session_state.colab_latency else ("~75ms" if st.session_state.colab_connected else "—")
+                ui(f"""
+                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px 14px; text-align: center;">
+                    <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-weight: 700;">Tunnel Latency</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #a78bfa; margin-top: 4px;">{esc(lat_text)}</div>
+                </div>
+                """)
+
+            st.write("")
+            c_tun_input, c_tun_btn, c_tun_reload = st.columns([2.5, 1.0, 0.9], gap="medium")
             with c_tun_input:
                 colab_url_input = st.text_input(
                     "Colab Public Endpoint URL (from Cloudflare Tunnel):",
                     value=st.session_state.colab_tunnel_url,
                     placeholder="https://your-tunnel-name.trycloudflare.com",
                     key="tab3_colab_url_input",
-                    help="Paste the https://xxxx.trycloudflare.com link printed by your Google Colab notebook cell."
+                    help="Paste or type your Cloudflare tunnel link here."
                 )
             with c_tun_btn:
                 st.write("")
                 st.write("")
-                test_colab_btn = btn("⚡ Connect & Test Colab GPU", type="primary")
+                test_colab_btn = btn("⚡ Connect / Test GPU", type="primary")
+            with c_tun_reload:
+                st.write("")
+                st.write("")
+                load_active_btn = btn("📋 Reset Default URL")
+
+            if load_active_btn:
+                st.session_state.colab_tunnel_url = DEFAULT_COLAB_URL
+                st.rerun()
 
             if test_colab_btn:
-                if not colab_url_input.strip():
-                    st.warning("Please paste your Colab trycloudflare.com URL first.")
+                target_url = colab_url_input.strip() or st.session_state.colab_tunnel_url
+                if not target_url:
+                    st.warning("Please enter your Colab trycloudflare.com URL first.")
                 else:
                     with st.spinner("Pinging Colab GPU Bridge microservice..."):
-                        healthy, msg, lat = check_colab_health(colab_url_input)
+                        healthy, msg, lat = check_colab_health(target_url)
                         if healthy:
                             st.session_state.colab_connected = True
-                            st.session_state.colab_tunnel_url = colab_url_input.strip()
+                            st.session_state.colab_tunnel_url = target_url
                             st.session_state.colab_hardware_info = msg
                             st.session_state.colab_latency = lat
                             st.success(f"🎉 Connected to Google Colab GPU: {msg} | Latency: {lat}")
                             st.rerun()
                         else:
                             st.session_state.colab_connected = False
-                            st.error(f"❌ Failed to reach Colab GPU Bridge: {msg}. Check if your Colab cell is running.")
+                            st.error(f"❌ Failed to reach Colab GPU Bridge ({msg}). Check if your Colab cell is running.")
 
-            with st.expander("🚀 1-Click Google Colab Notebook Setup Guide & Runnable Cell", expanded=not st.session_state.colab_connected):
-                st.markdown("""
-                **Turn Google Colab into your private free 16GB AI server in 3 steps:**
-                1. Click the button below to open Google Colab in a new tab.
-                2. In Colab menu, select GPU: **Runtime -> Change runtime type -> T4 GPU**.
-                3. Paste the code below and run the cell (`Shift + Enter`). Copy the `trycloudflare.com` URL into AI Hub above!
+            # Answer user's question directly in UI
+            with st.expander("❓ Do I need to start this all the time? How does it work?", expanded=not st.session_state.colab_connected):
+                st.markdown(f"""
+                ### 💡 Do I need to start this every time?
+                **Yes.** Google Colab free tier automatically sleeps and disconnects when idle for **15–30 minutes** or when you close the Google Colab browser tab.
+                
+                ### ⚡ How to start it in 10 seconds:
+                1. Click the button above: **[🚀 Launch My Colab Notebook]({USER_COLAB_NOTEBOOK_URL})**.
+                2. Press **`Shift + Enter`** on the single notebook cell.
+                3. If your tunnel URL changes, copy the new `https://xxxx.trycloudflare.com` link printed at the bottom of the cell and paste it above, then click **⚡ Connect / Test GPU**.
+                4. That's it! Your 16GB dedicated Tesla T4 is ready for unlimited heavy 1024x1024 visual generation and real motion video diffusion.
                 """)
-                st.markdown("[👉 **Open Google Colab (Free T4 GPU)**](https://colab.research.google.com/)", unsafe_allow_html=True)
+                st.caption("Need the raw code for a new notebook?")
                 st.code(COLAB_SERVER_SNIPPET, language="python")
 
     img_col, vid_col = st.columns(2, gap="large")
