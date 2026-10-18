@@ -43,6 +43,8 @@ ENV_PATH = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 import html
 import ui_kit as uikit
+import importlib
+importlib.reload(uikit)
 
 st.set_page_config(
     page_title="AI Hub",
