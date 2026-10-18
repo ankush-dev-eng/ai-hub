@@ -13,6 +13,7 @@ import json
 import os
 import pathlib
 import time
+from types import SimpleNamespace
 from typing import Dict, List, Tuple, Generator, Any
 
 from dotenv import load_dotenv
@@ -20,6 +21,8 @@ load_dotenv()
 
 import streamlit as st
 from openai import OpenAI
+
+import voice_hub
 
 ENDPOINTS_FILE = pathlib.Path("endpoints.json")
 
@@ -377,6 +380,7 @@ def render_chat():
         return
 
     prov, model, failover, search, use_rag, compare_mode, prov_b, model_b, system, temp = sidebar(reg)
+    vcfg = voice_hub.sidebar()
 
     # Render Chat History
     for m in ss.ch_hist:
@@ -398,12 +402,24 @@ def render_chat():
                         for cit in m["citations"]:
                             st.markdown(f"- **{cit['source']}** (Chunk {cit['chunk']}): `{cit['text']}`")
 
+    # Dock toolbar directly above chat input
+    with st.container(key="ch_dock_toolbar"):
+        col_mic, _ = st.columns([2.2, 7.8])
+        with col_mic:
+            spoken = voice_hub.mic_input(vcfg)
+
     # Bottom Sticky Input Dock with Multi-file attachment
     prompt = st.chat_input(
         "Ask anything or attach code, PDF & images...",
         accept_file="multiple",
         file_type=["png", "jpg", "jpeg", "webp", "pdf", "py", "js", "ts", "md", "json", "csv", "txt", "sql", "sh"],
     )
+
+    via_voice = False
+    if not prompt and spoken:
+        prompt = SimpleNamespace(text=spoken, files=[])
+        via_voice = True
+
     if not prompt:
         return
 
@@ -498,6 +514,9 @@ def render_chat():
             with st.expander("📚 Retrieved Document Chunks (ChromaDB)", expanded=False):
                 for cit in citations:
                     st.markdown(f"- **{cit['source']}** (Chunk {cit['chunk']}): `{cit['text']}`")
+
+        # Synthesize audio speech if active
+        voice_hub.speak(text, vcfg, via_voice)
 
     ss.ch_hist.append({"role": "assistant", "content": text, "used": used, "citations": citations})
     st.rerun()
