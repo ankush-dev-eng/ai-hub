@@ -774,29 +774,28 @@ html.fx-cursor-on summary {
    ===================================================================== */
 
 /* When fullscreen is active, lock background and reset isolating stacking contexts */
-body:has([data-testid="stFullScreenFrame"]),
-body:has(div[class*="fullScreenFrame"]),
-body:has(div[class*="FullScreenFrame"]),
-body:has(.stFullScreenFrame),
+body:has(button[aria-label*="Close fullscreen"]),
+body:has(button[title*="exit fullscreen" i]),
+body:has(button[title*="close fullscreen" i]),
 body.in-fullscreen {
   overflow: hidden !important;
 }
 
-body:has([data-testid="stFullScreenFrame"]) [data-testid="column"],
-body:has(div[class*="fullScreenFrame"]) [data-testid="column"],
-body:has(.stFullScreenFrame) [data-testid="column"],
+body:has(button[aria-label*="Close fullscreen"]) [data-testid="column"],
+body:has(button[title*="exit fullscreen" i]) [data-testid="column"],
 body.in-fullscreen [data-testid="column"],
-body:has([data-testid="stFullScreenFrame"]) [class*="st-key-panel"],
-body:has(div[class*="fullScreenFrame"]) [class*="st-key-panel"],
-body:has(.stFullScreenFrame) [class*="st-key-panel"],
+body:has(button[aria-label*="Close fullscreen"]) [class*="st-key-panel"],
+body:has(button[title*="exit fullscreen" i]) [class*="st-key-panel"],
 body.in-fullscreen [class*="st-key-panel"],
-body:has([data-testid="stFullScreenFrame"]) .fx-card,
-body:has(div[class*="fullScreenFrame"]) .fx-card,
+body:has(button[aria-label*="Close fullscreen"]) .fx-card,
+body:has(button[title*="exit fullscreen" i]) .fx-card,
 body.in-fullscreen .fx-card,
-body:has([data-testid="stFullScreenFrame"]) [data-testid="stLayoutWrapper"],
-body:has(div[class*="fullScreenFrame"]) [data-testid="stLayoutWrapper"],
-body:has([data-testid="stFullScreenFrame"]) [data-testid="stHorizontalBlock"],
-body:has(div[class*="fullScreenFrame"]) [data-testid="stHorizontalBlock"] {
+body:has(button[aria-label*="Close fullscreen"]) [data-testid="stLayoutWrapper"],
+body:has(button[title*="exit fullscreen" i]) [data-testid="stLayoutWrapper"],
+body.in-fullscreen [data-testid="stLayoutWrapper"],
+body:has(button[aria-label*="Close fullscreen"]) [data-testid="stHorizontalBlock"],
+body:has(button[title*="exit fullscreen" i]) [data-testid="stHorizontalBlock"],
+body.in-fullscreen [data-testid="stHorizontalBlock"] {
   isolation: auto !important;
   transform: none !important;
   perspective: none !important;
@@ -805,30 +804,28 @@ body:has(div[class*="fullScreenFrame"]) [data-testid="stHorizontalBlock"] {
 }
 
 /* Hide conflicting elements (sticky tabs, sidebar, header, progress bar) during fullscreen */
-body:has([data-testid="stFullScreenFrame"]) .stTabs [role="tablist"],
-body:has(div[class*="fullScreenFrame"]) .stTabs [role="tablist"],
-body:has(div[class*="FullScreenFrame"]) .stTabs [role="tablist"],
-body:has(.stFullScreenFrame) .stTabs [role="tablist"],
+body:has(button[aria-label*="Close fullscreen"]) .stTabs [role="tablist"],
+body:has(button[title*="exit fullscreen" i]) .stTabs [role="tablist"],
 body.in-fullscreen .stTabs [role="tablist"],
-body:has([data-testid="stFullScreenFrame"]) header[data-testid="stHeader"],
-body:has(div[class*="fullScreenFrame"]) header[data-testid="stHeader"],
+body:has(button[aria-label*="Close fullscreen"]) header[data-testid="stHeader"],
+body:has(button[title*="exit fullscreen" i]) header[data-testid="stHeader"],
 body.in-fullscreen header[data-testid="stHeader"],
-body:has([data-testid="stFullScreenFrame"]) section[data-testid="stSidebar"],
-body:has(div[class*="fullScreenFrame"]) section[data-testid="stSidebar"],
+body:has(button[aria-label*="Close fullscreen"]) section[data-testid="stSidebar"],
+body:has(button[title*="exit fullscreen" i]) section[data-testid="stSidebar"],
 body.in-fullscreen section[data-testid="stSidebar"],
-body:has([data-testid="stFullScreenFrame"]) .fx-progress,
-body:has(div[class*="fullScreenFrame"]) .fx-progress,
+body:has(button[aria-label*="Close fullscreen"]) .fx-progress,
+body:has(button[title*="exit fullscreen" i]) .fx-progress,
 body.in-fullscreen .fx-progress {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
-/* Fullscreen Frame: Topmost modal above everything */
-[data-testid="stFullScreenFrame"],
-div[class*="fullScreenFrame"],
-div[class*="FullScreenFrame"],
-.stFullScreenFrame {
+/* Fullscreen Frame: Topmost modal above everything ONLY when active */
+[data-testid="stFullScreenFrame"]:has(button[aria-label*="Close fullscreen"]),
+[data-testid="stFullScreenFrame"]:has(button[title*="exit fullscreen" i]),
+[data-testid="stFullScreenFrame"]:has(button[title*="close fullscreen" i]),
+div[class*="fullScreenFrame"]:has(button[aria-label*="Close fullscreen"]) {
   position: fixed !important;
   inset: 0 !important;
   top: 0 !important;
@@ -852,10 +849,8 @@ div[class*="FullScreenFrame"],
 }
 
 /* Fullscreen image display: remove 3D perspective skew, fit cleanly inside viewport */
-[data-testid="stFullScreenFrame"] img,
-div[class*="fullScreenFrame"] img,
-div[class*="FullScreenFrame"] img,
-.stFullScreenFrame img {
+[data-testid="stFullScreenFrame"]:has(button[aria-label*="Close fullscreen"]) img,
+[data-testid="stFullScreenFrame"]:has(button[title*="exit fullscreen" i]) img {
   max-width: 90vw !important;
   max-height: 88vh !important;
   width: auto !important;
@@ -871,12 +866,11 @@ div[class*="FullScreenFrame"] img,
 }
 
 /* Fullscreen Close / Exit / Minimize Button: Luxury floating pill button, always visible & clickable */
-[data-testid="StyledFullScreenButton"],
+button[aria-label*="Close fullscreen"],
 button[title*="exit fullscreen" i],
 button[title*="close fullscreen" i],
-[data-testid="stFullScreenFrame"] button,
-div[class*="fullScreenFrame"] button,
-.stFullScreenFrame button {
+[data-testid="StyledFullScreenButton"]:has(svg),
+[data-testid="stFullScreenFrame"]:has(button[aria-label*="Close fullscreen"]) button {
   position: fixed !important;
   top: 1.8rem !important;
   right: 2.2rem !important;
@@ -898,20 +892,18 @@ div[class*="fullScreenFrame"] button,
   transition: all 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) !important;
 }
 
-[data-testid="StyledFullScreenButton"]:hover,
+button[aria-label*="Close fullscreen"]:hover,
 button[title*="exit fullscreen" i]:hover,
-[data-testid="stFullScreenFrame"] button:hover,
-div[class*="fullScreenFrame"] button:hover {
+[data-testid="StyledFullScreenButton"]:hover {
   background: linear-gradient(135deg, #6366f1, #22d3ee) !important;
   border-color: #ffffff !important;
   transform: scale(1.12) !important;
   box-shadow: 0 14px 40px rgba(99, 102, 241, 0.85), 0 0 20px #22d3ee !important;
 }
 
-[data-testid="StyledFullScreenButton"] svg,
+button[aria-label*="Close fullscreen"] svg,
 button[title*="exit fullscreen" i] svg,
-[data-testid="stFullScreenFrame"] button svg,
-div[class*="fullScreenFrame"] button svg {
+[data-testid="StyledFullScreenButton"] svg {
   width: 24px !important;
   height: 24px !important;
   color: #ffffff !important;

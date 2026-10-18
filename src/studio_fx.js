@@ -171,7 +171,7 @@
     }
 
     function checkFullscreen() {
-      var isFs = !!doc.querySelector('[data-testid="stFullScreenFrame"], div[class*="fullScreenFrame"], div[class*="FullScreenFrame"], .stFullScreenFrame');
+      var isFs = !!doc.querySelector('button[aria-label*="Close fullscreen"], button[title*="Exit fullscreen" i], button[title*="close fullscreen" i]');
       doc.body.classList.toggle('in-fullscreen', isFs);
       root.classList.toggle('in-fullscreen', isFs);
     }
