@@ -2208,10 +2208,10 @@ if "tab3_video_caption" not in st.session_state:
 # Tab 3: Google Colab GPU Bridge State
 GITHUB_COLAB_URL = "https://colab.research.google.com/github/ankush-dev-eng/ai-hub/blob/main/colab_gpu_bridge.ipynb"
 USER_COLAB_NOTEBOOK_URL = "https://colab.research.google.com/drive/1NLglQnhW0r9KUwGtVx-HK8KalRrHlXM0?authuser=8#scrollTo=puwlbLMxFrZ2"
-DEFAULT_COLAB_URL = "https://living-sides-deemed-emma.trycloudflare.com"
+DEFAULT_COLAB_URL = ""
 
 COLAB_CACHE_FILE = ROOT_DIR / ".colab_tunnel_cache.txt"
-if "colab_tunnel_url" not in st.session_state or not st.session_state.colab_tunnel_url:
+if "colab_tunnel_url" not in st.session_state:
     cached_tunnel = ""
     if os.path.exists(COLAB_CACHE_FILE):
         try:
@@ -2219,7 +2219,7 @@ if "colab_tunnel_url" not in st.session_state or not st.session_state.colab_tunn
                 cached_tunnel = f.read().strip()
         except Exception:
             pass
-    st.session_state.colab_tunnel_url = cached_tunnel or DEFAULT_COLAB_URL
+    st.session_state.colab_tunnel_url = cached_tunnel
 
 if "colab_connected" not in st.session_state:
     st.session_state.colab_connected = False
@@ -2227,8 +2227,10 @@ if "colab_hardware_info" not in st.session_state:
     st.session_state.colab_hardware_info = ""
 if "colab_latency" not in st.session_state:
     st.session_state.colab_latency = ""
+if "colab_last_error" not in st.session_state:
+    st.session_state.colab_last_error = None
 if "tab3_hw_engine_selector" not in st.session_state:
-    st.session_state.tab3_hw_engine_selector = "⚡ Google Colab GPU Bridge (16GB Dedicated T4 GPU • True Video Diffusion)"
+    st.session_state.tab3_hw_engine_selector = "☁️ Free Cloud Tier (Hugging Face ZeroGPU & Storyboard Synthesizer)"
 if "tab3_audio_bytes" not in st.session_state:
     st.session_state.tab3_audio_bytes = None
 if "tab3_audio_caption" not in st.session_state:
@@ -2237,19 +2239,6 @@ if "tab3_aud_preset" not in st.session_state:
     st.session_state.tab3_aud_preset = list(AUDIO_PRESETS.keys())[0]
 if "tab3_aud_prompt" not in st.session_state:
     st.session_state.tab3_aud_prompt = AUDIO_PRESETS[list(AUDIO_PRESETS.keys())[0]]
-
-# Auto-probe connection on first load
-if "colab_auto_probed" not in st.session_state:
-    st.session_state.colab_auto_probed = True
-    try:
-        ok, gpu_desc, ping_str = check_colab_health(st.session_state.colab_tunnel_url)
-        if ok:
-            st.session_state.colab_connected = True
-            st.session_state.colab_hardware_info = gpu_desc
-            st.session_state.colab_latency = ping_str
-            st.session_state.tab3_hw_engine_selector = "⚡ Google Colab GPU Bridge (16GB Dedicated T4 GPU • True Video Diffusion)"
-    except Exception:
-        pass
 
 # Extra state for the redesigned UI
 if "last_latency" not in st.session_state:
@@ -2841,27 +2830,27 @@ elif view == uikit.NAV[2]:
                     </div>
                     """)
             with c_m2:
-                gpu_text = st.session_state.colab_hardware_info.split("(")[0].strip() if st.session_state.colab_hardware_info else "Tesla T4"
+                gpu_text = st.session_state.colab_hardware_info.split("(")[0].strip() if (st.session_state.colab_connected and st.session_state.colab_hardware_info) else "Not Connected"
                 ui(f"""
                 <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px 14px; text-align: center;">
                     <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-weight: 700;">Cloud Accelerator</div>
-                    <div style="font-size: 1.15rem; font-weight: 800; color: #f1f5f9; margin-top: 4px;">{esc(gpu_text)}</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: {'#f1f5f9' if st.session_state.colab_connected else '#64748b'}; margin-top: 4px;">{esc(gpu_text)}</div>
                 </div>
                 """)
             with c_m3:
-                vram_text = "14.6 GB VRAM" if ("14" in st.session_state.colab_hardware_info or "15" in st.session_state.colab_hardware_info) else ("16.0 GB VRAM" if st.session_state.colab_connected else "16 GB Available")
+                vram_text = "14.6 GB VRAM" if (st.session_state.colab_connected and ("14" in st.session_state.colab_hardware_info or "15" in st.session_state.colab_hardware_info)) else ("16.0 GB VRAM" if st.session_state.colab_connected else "Offline (Cloud Active)")
                 ui(f"""
                 <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px 14px; text-align: center;">
                     <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-weight: 700;">Dedicated Memory</div>
-                    <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin-top: 4px;">{esc(vram_text)}</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: {'#38bdf8' if st.session_state.colab_connected else '#64748b'}; margin-top: 4px;">{esc(vram_text)}</div>
                 </div>
                 """)
             with c_m4:
-                lat_text = st.session_state.colab_latency if st.session_state.colab_latency else ("~75ms" if st.session_state.colab_connected else "—")
+                lat_text = st.session_state.colab_latency if (st.session_state.colab_connected and st.session_state.colab_latency) else "—"
                 ui(f"""
                 <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px 14px; text-align: center;">
                     <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-weight: 700;">Tunnel Latency</div>
-                    <div style="font-size: 1.15rem; font-weight: 800; color: #a78bfa; margin-top: 4px;">{esc(lat_text)}</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: {'#a78bfa' if st.session_state.colab_connected else '#64748b'}; margin-top: 4px;">{esc(lat_text)}</div>
                 </div>
                 """)
 
@@ -2877,6 +2866,10 @@ elif view == uikit.NAV[2]:
                 )
                 if colab_url_input and colab_url_input.strip() != st.session_state.get("colab_tunnel_url", ""):
                     st.session_state.colab_tunnel_url = colab_url_input.strip()
+                    st.session_state.colab_connected = False
+                    st.session_state.colab_hardware_info = ""
+                    st.session_state.colab_latency = ""
+                    st.session_state.colab_last_error = None
                     try:
                         with open(COLAB_CACHE_FILE, "w", encoding="utf-8") as f:
                             f.write(colab_url_input.strip())
@@ -2889,21 +2882,26 @@ elif view == uikit.NAV[2]:
             with c_tun_reload:
                 st.write("")
                 st.write("")
-                load_active_btn = btn("📋 Reset Default URL")
+                load_active_btn = btn("🔌 Disconnect / Clear")
 
             if load_active_btn:
-                st.session_state.colab_tunnel_url = DEFAULT_COLAB_URL
-                try:
-                    with open(COLAB_CACHE_FILE, "w", encoding="utf-8") as f:
-                        f.write(DEFAULT_COLAB_URL)
-                except Exception:
-                    pass
+                st.session_state.colab_tunnel_url = ""
+                st.session_state.colab_connected = False
+                st.session_state.colab_hardware_info = ""
+                st.session_state.colab_latency = ""
+                st.session_state.colab_last_error = None
+                st.session_state.tab3_hw_engine_selector = "☁️ Free Cloud Tier (Hugging Face ZeroGPU & Storyboard Synthesizer)"
+                if os.path.exists(COLAB_CACHE_FILE):
+                    try: os.remove(COLAB_CACHE_FILE)
+                    except Exception: pass
                 st.rerun()
 
             if test_colab_btn:
                 target_url = colab_url_input.strip() or st.session_state.colab_tunnel_url
                 if not target_url:
-                    st.warning("Please enter your Colab trycloudflare.com URL first.")
+                    st.session_state.colab_connected = False
+                    st.session_state.colab_last_error = "Please enter your Colab trycloudflare.com URL first."
+                    st.rerun()
                 else:
                     with st.spinner("Pinging Colab GPU Bridge microservice..."):
                         healthy, msg, lat = check_colab_health(target_url)
@@ -2912,16 +2910,29 @@ elif view == uikit.NAV[2]:
                             st.session_state.colab_tunnel_url = target_url
                             st.session_state.colab_hardware_info = msg
                             st.session_state.colab_latency = lat
+                            st.session_state.colab_last_error = None
+                            st.session_state.tab3_hw_engine_selector = "⚡ Google Colab GPU Bridge (16GB Dedicated T4 GPU • True Video Diffusion)"
                             try:
                                 with open(COLAB_CACHE_FILE, "w", encoding="utf-8") as f:
                                     f.write(target_url)
                             except Exception:
                                 pass
-                            st.success(f"🎉 Connected to Google Colab GPU: {msg} | Latency: {lat}")
                             st.rerun()
                         else:
                             st.session_state.colab_connected = False
-                            st.error(f"❌ Failed to reach Colab GPU Bridge ({msg}). Check if your Colab cell is running.")
+                            st.session_state.colab_hardware_info = ""
+                            st.session_state.colab_latency = ""
+                            st.session_state.colab_last_error = f"Failed to reach Colab GPU Bridge ({msg}). Check if your Colab cell is running."
+                            if os.path.exists(COLAB_CACHE_FILE):
+                                try: os.remove(COLAB_CACHE_FILE)
+                                except Exception: pass
+                            st.rerun()
+
+            # Live feedback status banner
+            if st.session_state.get("colab_last_error"):
+                st.error(f"❌ {st.session_state.colab_last_error}")
+            elif st.session_state.colab_connected:
+                st.success(f"🎉 Connected to Google Colab GPU: {st.session_state.colab_hardware_info} | Latency: {st.session_state.colab_latency}")
 
             # Answer user's question directly in UI
             with st.expander("❓ Do I need to start this all the time? How does it work?", expanded=not st.session_state.colab_connected):
