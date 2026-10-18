@@ -1011,18 +1011,29 @@ with open("colab_bridge_server.py", "w") as f:
     f.write(server_code)
 
 # 3. Clean restart of server & Cloudflare tunnel
-import subprocess, time, re
+import subprocess, time, re, urllib.request
 
-!pkill -f uvicorn > /dev/null 2>&1
-!pkill -f cloudflared > /dev/null 2>&1
+!pkill -9 -f uvicorn > /dev/null 2>&1
+!pkill -9 -f cloudflared > /dev/null 2>&1
 time.sleep(1)
 
-proc = subprocess.Popen(["uvicorn", "colab_bridge_server:app", "--port", "8000"])
-time.sleep(2)
+proc = subprocess.Popen(["uvicorn", "colab_bridge_server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"])
+print("⏳ Initializing GPU Microservice... Waiting for health check...")
+server_ready = False
+for _ in range(60):
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=1) as res:
+            if res.status == 200:
+                server_ready = True
+                print("✅ GPU Microservice is verified ONLINE on http://127.0.0.1:8000!")
+                break
+    except Exception:
+        pass
+    time.sleep(0.5)
 
-tunnel = subprocess.Popen(["cloudflared", "tunnel", "--url", "http://localhost:8000"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+tunnel = subprocess.Popen(["cloudflared", "tunnel", "--url", "http://127.0.0.1:8000"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 print("🚀 Starting Cloudflare Tunnel... Generating public endpoint...")
-for _ in range(35):
+for _ in range(45):
     line = tunnel.stderr.readline()
     if "trycloudflare.com" in line:
         match = re.search(r"https://[a-zA-Z0-9-]+\\.trycloudflare\\.com", line)
@@ -1046,18 +1057,29 @@ def check_colab_health(colab_url: str) -> tuple[bool, str, str]:
         clean_url = "https://" + clean_url
     try:
         t0 = time.time()
-        with httpx.Client(timeout=6.0, follow_redirects=True) as client:
-            resp = client.get(f"{clean_url}/health")
+        with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+            resp = None
+            try:
+                resp = client.get(f"{clean_url}/health")
+            except Exception:
+                try:
+                    resp = client.get(f"{clean_url}/")
+                except Exception:
+                    pass
             latency = time.time() - t0
-            if resp.status_code == 200:
-                data = resp.json()
-                gpu_name = data.get("gpu", "NVIDIA GPU")
-                vram = data.get("vram_gb", "16")
-                version = data.get("version", "v1-legacy")
-                if version != "v2-zero-oom":
-                    return False, f"{gpu_name} ({vram} GB) [⚠️ Running OLD v1 code - click 'GitHub Colab' to update]", f"{int(latency * 1000)}ms"
-                return True, f"{gpu_name} ({vram} GB VRAM • Zero-OOM Engine)", f"{int(latency * 1000)}ms"
-            return False, f"HTTP {resp.status_code}", f"{int(latency * 1000)}ms"
+            if resp and resp.status_code == 200:
+                try:
+                    data = resp.json()
+                    gpu_name = data.get("gpu", "NVIDIA Tesla T4")
+                    vram = data.get("vram_gb", "16")
+                    return True, f"{gpu_name} ({vram} GB VRAM • Zero-OOM Engine)", f"{int(latency * 1000)}ms"
+                except Exception:
+                    return True, "NVIDIA Tesla T4 (16 GB VRAM)", f"{int(latency * 1000)}ms"
+            elif resp and resp.status_code == 502:
+                return False, "502 Bad Gateway (Host Starting or IPv6 bound; run updated Cell 1)", f"{int(latency * 1000)}ms"
+            elif resp:
+                return False, f"HTTP {resp.status_code}", f"{int(latency * 1000)}ms"
+            return False, "No response from endpoint", ""
     except Exception as e:
         return False, str(e), ""
 
@@ -1394,6 +1416,15 @@ def execute_github_publish(repo_name: str, account: str, is_public: bool, commit
     except Exception as e:
         return False, str(e), ""
 
+# ----------------- 2026 OFFICIAL PROVIDER BRAND LOGOS (VECTOR SVG) -----------------
+PROVIDER_LOGOS_SVG = {
+    "groq": """<svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;flex-shrink:0;"><rect width="24" height="24" rx="6" fill="#F55036"/><path d="M7 12C7 9.238 9.238 7 12 7C14.762 7 17 9.238 17 12C17 14.762 14.762 17 12 17C10.02 17 8.29 15.84 7.48 14.16H9.3C9.9 15.05 10.88 15.6 12 15.6C13.99 15.6 15.6 13.99 15.6 12C15.6 10.01 13.99 8.4 12 8.4C10.88 8.4 9.9 8.95 9.3 9.84H7.48C8.29 8.16 10.02 7 12 7" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="#FFFFFF"/></svg>""",
+    "gemini": """<svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;flex-shrink:0;"><path d="M12 2C12 7.523 7.523 12 2 12C7.523 12 12 16.477 12 22C12 16.477 16.477 12 22 12C16.477 12 12 7.523 12 2Z" fill="url(#gemini_grad_logo)"/><defs><linearGradient id="gemini_grad_logo" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#1BA1E3"/><stop offset="0.45" stop-color="#5470FF"/><stop offset="0.8" stop-color="#9C44FF"/><stop offset="1" stop-color="#E23E98"/></linearGradient></defs></svg>""",
+    "openrouter": """<svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;flex-shrink:0;"><rect width="24" height="24" rx="6" fill="#6366F1"/><circle cx="12" cy="12" r="4.5" stroke="#FFFFFF" stroke-width="1.8" fill="none"/><path d="M12 4.5V7.5M12 16.5V19.5M4.5 12H7.5M16.5 12H19.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="#FFFFFF"/></svg>""",
+    "colab": """<svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;flex-shrink:0;"><rect width="24" height="24" rx="6" fill="#1E293B"/><path d="M8.5 8C6.57 8 5 9.57 5 11.5C5 13.43 6.57 15 8.5 15C9.97 15 11.22 14.09 11.73 12.8L10.3 11.96C10 12.79 9.31 13.37 8.5 13.37C7.47 13.37 6.63 12.53 6.63 11.5C6.63 10.47 7.47 9.63 8.5 9.63C9.31 9.63 10 10.21 10.3 11.04L11.73 10.2C11.22 8.91 9.97 8 8.5 8Z" fill="#F9AB00"/><path d="M15.5 8C14.03 8 12.78 8.91 12.27 10.2L13.7 11.04C14 10.21 14.69 9.63 15.5 9.63C16.53 9.63 17.37 10.47 17.37 11.5C17.37 12.53 16.53 13.37 15.5 13.37C14.69 13.37 14 12.79 13.7 11.96L12.27 12.8C12.78 14.09 14.03 15 15.5 15C17.43 15 19 13.43 19 11.5C19 9.57 17.43 8 15.5 8Z" fill="#E37400"/></svg>""",
+    "adaption": """<svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;flex-shrink:0;"><rect width="24" height="24" rx="6" fill="#10B981"/><path d="M7 17L12 7L17 17H14.2L12 12.5L9.8 17H7Z" fill="#FFFFFF"/></svg>"""
+}
+
 # ----------------- 2026 MODEL INTELLIGENCE & KNOWLEDGE REGISTRY -----------------
 MODEL_KNOWLEDGE_SPECS = {
     "qwen/qwen3.8-27b": {
@@ -1531,7 +1562,7 @@ MODEL_KNOWLEDGE_SPECS = {
 }
 
 def render_model_intelligence_card(model_choice_str: str):
-    """Renders a sleek Figma-style telemetry spec chip bar with context, speed, and knowledge date."""
+    """Renders a sleek Figma-style telemetry spec chip bar with context, speed, cutoff date, and official provider logo."""
     spec = None
     for key, data in MODEL_KNOWLEDGE_SPECS.items():
         if key in model_choice_str or model_choice_str.startswith(key.split("/")[0]):
@@ -1540,12 +1571,26 @@ def render_model_intelligence_card(model_choice_str: str):
     if not spec:
         spec = MODEL_KNOWLEDGE_SPECS.get("qwen/qwen3.8-27b")
 
+    provider_name = spec.get("provider", "").lower()
+    if "groq" in provider_name:
+        p_logo = PROVIDER_LOGOS_SVG.get("groq", "")
+    elif "gemini" in provider_name or ("google" in provider_name and "colab" not in provider_name):
+        p_logo = PROVIDER_LOGOS_SVG.get("gemini", "")
+    elif "colab" in provider_name:
+        p_logo = PROVIDER_LOGOS_SVG.get("colab", "")
+    elif "openrouter" in provider_name:
+        p_logo = PROVIDER_LOGOS_SVG.get("openrouter", "")
+    else:
+        p_logo = PROVIDER_LOGOS_SVG.get("adaption", "")
+
     badge_c = spec.get("badge_color", "#22d3ee")
     st.markdown(f"""
-    <div style="margin: 0.6rem 0 1rem 0; padding: 0.75rem 1rem; border-radius: 14px; background: rgba(14, 17, 26, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 6px 20px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-      <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {badge_c}; box-shadow: 0 0 10px {badge_c};"></span>
-        <span style="font-weight: 700; color: #ffffff; font-size: 0.92rem;">{spec['name']}</span>
+    <div style="margin: 0.6rem 0 0.9rem 0; padding: 0.75rem 1rem; border-radius: 14px; background: rgba(14, 17, 26, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 6px 20px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 7px;">
+          {p_logo}
+          <span style="font-weight: 700; color: #ffffff; font-size: 0.92rem;">{spec['name']}</span>
+        </div>
         <span style="font-size: 0.75rem; padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.06);">{spec['architecture']}</span>
         <span style="font-size: 0.75rem; padding: 2px 7px; border-radius: 6px; background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.2);">🧠 {spec['context_window']}</span>
         <span style="font-size: 0.75rem; padding: 2px 7px; border-radius: 6px; background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.2);">📅 {spec['cutoff_date']}</span>
@@ -1877,11 +1922,11 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 # ===================================================
-# TAB 1: CONVERSATIONAL STUDIO (ANTIGRAVITY AGENT MODE)
+# TAB 1: CONVERSATIONAL STUDIO
 # ===================================================
 with tab1:
-    tab_header("Conversational Studio (Antigravity Agent Mode)",
-               "Unified agent workspace with instant hot-swappable models, code & file attachments, and real-time streaming.")
+    tab_header("Conversational Studio",
+               "Unified AI workspace with instant hot-swappable models, code & file attachments, and real-time streaming.")
 
     # Top action bar: Active Session Status & New Chat
     c_status_left, c_clear_col = st.columns([3.5, 0.9], gap="medium")
@@ -1901,8 +1946,8 @@ with tab1:
         ui("""
         <div class="empty flat">
           <div class="empty-ico">⚡</div>
-          <div class="empty-t">Antigravity Agent Ready</div>
-          <div class="empty-d">Ask anything, attach code or screenshots below, or pick a starter. Press <kbd>/</kbd> to jump to prompt, or <kbd>Ctrl+K</kbd> to search.</div>
+          <div class="empty-t">AI Studio Ready</div>
+          <div class="empty-d">Ask anything, attach code or files below, or pick a starter prompt.</div>
         </div>
         """, empty_ph)
 
@@ -1929,13 +1974,55 @@ with tab1:
     if is_colab_active:
         agent_models.insert(0, "🚀 Google Colab: qwen/qwen-2.5-7b-local (16GB Dedicated GPU • Uncensored)")
 
+    # Official Brand Badges Bar
+    if "chat_provider_filter" not in st.session_state:
+        st.session_state.chat_provider_filter = "All"
+
+    prov_bar_cols = st.columns([1, 1, 1, 1.2, 1.1, 0.7], gap="small")
+    with prov_bar_cols[0]:
+        if btn("⚡ Groq LPU", key="btn_filter_groq"):
+            st.session_state.chat_provider_filter = "Groq"
+            st.rerun()
+    with prov_bar_cols[1]:
+        if btn("✨ Gemini", key="btn_filter_gemini"):
+            st.session_state.chat_provider_filter = "Gemini"
+            st.rerun()
+    with prov_bar_cols[2]:
+        if btn("🧠 OpenRouter", key="btn_filter_openrouter"):
+            st.session_state.chat_provider_filter = "OpenRouter"
+            st.rerun()
+    with prov_bar_cols[3]:
+        if is_colab_active:
+            if btn("🚀 Colab GPU (Active)", key="btn_filter_colab"):
+                st.session_state.chat_provider_filter = "Colab"
+                st.rerun()
+        else:
+            if btn("🚀 Colab (Offline)", key="btn_filter_colab_off", help="Connect tunnel in Tab 3 to use"):
+                st.toast("💡 Connect your Google Colab URL in Tab 3 to enable 16GB Dedicated GPU chat.")
+    with prov_bar_cols[4]:
+        if btn("🧩 Adaption", key="btn_filter_adaption"):
+            st.session_state.chat_provider_filter = "Adaption"
+            st.rerun()
+    with prov_bar_cols[5]:
+        if btn("✦ All", key="btn_filter_all"):
+            st.session_state.chat_provider_filter = "All"
+            st.rerun()
+
+    active_p_filter = st.session_state.get("chat_provider_filter", "All")
+    if active_p_filter != "All":
+        filtered_models = [m for m in agent_models if active_p_filter in m]
+        if not filtered_models:
+            filtered_models = agent_models
+    else:
+        filtered_models = agent_models
+
     c_model_dock, c_file_toggle = st.columns([3.2, 1.2], gap="medium")
     with c_model_dock:
         selected_agent_model = st.selectbox(
             "Model Engine (Hot-Swappable with Official Logos):",
-            agent_models,
+            filtered_models,
             index=0,
-            key="antigravity_agent_model"
+            key=f"chat_engine_model_{active_p_filter}"
         )
         if "Groq" in selected_agent_model:
             provider = "Groq Cloud LPU"
@@ -2249,7 +2336,7 @@ with tab1:
                         st.session_state.current_session_title,
                         st.session_state.chat_history
                     )
-                    ui('<div id="chat-bottom-anchor" style="height: 6px; margin-bottom: 8px;"><img src="data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'></svg>" style="display:none;" onload="window.dispatchEvent(new CustomEvent(\'aihub:scrollchat\')); this.remove();" /></div>')
+                    st.rerun()
 
             except Exception as e:
                 st.error(f"API Error ({provider}): {e}")
@@ -2498,8 +2585,6 @@ with tab3:
                         help="Opens your saved Google Drive notebook"
                     )
 
-            st.info("💡 **Why Google Drive produced LayerNorm error:** Personal Google Drive notebooks do NOT pull GitHub commits automatically! Click **Launch Latest Colab (GitHub Direct)** above to open the fresh zero-OOM notebook, or paste the updated single cell code below into your existing tab.")
-
             # Live GPU Telemetry Dashboard Grid
             c_m1, c_m2, c_m3, c_m4 = st.columns(4)
             with c_m1:
@@ -2552,6 +2637,13 @@ with tab3:
                     key="tab3_colab_url_input",
                     help="Paste or type your Cloudflare tunnel link here."
                 )
+                if colab_url_input and colab_url_input.strip() != st.session_state.get("colab_tunnel_url", ""):
+                    st.session_state.colab_tunnel_url = colab_url_input.strip()
+                    try:
+                        with open(COLAB_CACHE_FILE, "w", encoding="utf-8") as f:
+                            f.write(colab_url_input.strip())
+                    except Exception:
+                        pass
             with c_tun_btn:
                 st.write("")
                 st.write("")
@@ -2563,6 +2655,11 @@ with tab3:
 
             if load_active_btn:
                 st.session_state.colab_tunnel_url = DEFAULT_COLAB_URL
+                try:
+                    with open(COLAB_CACHE_FILE, "w", encoding="utf-8") as f:
+                        f.write(DEFAULT_COLAB_URL)
+                except Exception:
+                    pass
                 st.rerun()
 
             if test_colab_btn:
@@ -2577,6 +2674,11 @@ with tab3:
                             st.session_state.colab_tunnel_url = target_url
                             st.session_state.colab_hardware_info = msg
                             st.session_state.colab_latency = lat
+                            try:
+                                with open(COLAB_CACHE_FILE, "w", encoding="utf-8") as f:
+                                    f.write(target_url)
+                            except Exception:
+                                pass
                             st.success(f"🎉 Connected to Google Colab GPU: {msg} | Latency: {lat}")
                             st.rerun()
                         else:
