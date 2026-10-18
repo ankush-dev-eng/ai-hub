@@ -324,96 +324,7 @@ ul.contains-task-list li.task-completed {
   box-shadow: 0 0 14px var(--a1);
 }
 
-.fx-cursor-dot, .fx-cursor-ring {
-  position: fixed;
-  left: 0;
-  top: 0;
-  pointer-events: none;
-  z-index: 2147483000;
-  opacity: 0;
-  transition: opacity 0.2s ease, width 0.2s var(--ease), height 0.2s var(--ease), background 0.2s ease, border-color 0.2s ease;
-}
 
-.fx-cursor-dot {
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 12px 2px var(--a2);
-}
-
-.fx-cursor-ring {
-  width: 36px;
-  height: 36px;
-  margin: -18px 0 0 -18px;
-  border-radius: 50%;
-  border: 1.5px solid color-mix(in srgb, var(--a1) 80%, #ffffff 15%);
-  box-shadow: 0 0 24px -4px var(--a1), inset 0 0 14px -6px var(--a2);
-  mix-blend-mode: screen;
-}
-
-html.fx-cursor-on .fx-cursor-dot,
-html.fx-cursor-on .fx-cursor-ring {
-  opacity: 1;
-}
-
-/* Hover expansion over links & buttons */
-.fx-cursor-ring.is-link {
-  width: 52px;
-  height: 52px;
-  margin: -26px 0 0 -26px;
-  background: color-mix(in srgb, var(--a1) 16%, transparent);
-  border-color: var(--a2);
-}
-
-/* Morph to subtle vertical pill over text fields */
-.fx-cursor-ring.is-text {
-  width: 4px;
-  height: 24px;
-  margin: -12px 0 0 -2px;
-  border-radius: 3px;
-  background: var(--a2);
-  border-color: transparent;
-}
-
-.fx-cursor-dot.is-text {
-  opacity: 0 !important;
-}
-
-/* Click feedback squish */
-.fx-cursor-ring.is-down {
-  width: 24px;
-  height: 24px;
-  margin: -12px 0 0 -12px;
-  background: color-mix(in srgb, var(--a2) 35%, transparent);
-}
-
-/* Ensure mouse pointer is always natural and never lost */
-html.fx-cursor-on button,
-html.fx-cursor-on a,
-html.fx-cursor-on [role="tab"],
-html.fx-cursor-on [role="option"],
-html.fx-cursor-on summary {
-  cursor: pointer !important;
-}
-
-/* Click shockwave ripple */
-.fx-ripple {
-  position: fixed;
-  width: 14px;
-  height: 14px;
-  margin: -7px 0 0 -7px;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 2147482999;
-  border: 2px solid var(--a2);
-  animation: ripple 0.65s ease-out forwards;
-}
-
-@keyframes ripple {
-  to { transform: scale(7.5); opacity: 0; }
-}
 
 /* ---------- Command Palette (Ctrl+K / Cmd+K) ---------- */
 .fx-pal-back {
@@ -867,9 +778,7 @@ html.fx-cursor-on summary {
 .stApp:has(#fx-flags[data-lite="1"]) .hx-title { animation: none !important; }
 .stApp:has(#fx-flags[data-lite="1"]) .hx-slot { display: none !important; }
 
-@media (pointer: coarse) {
-  .fx-cursor-dot, .fx-cursor-ring { display: none !important; }
-}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .hx-slot { display: none !important; }

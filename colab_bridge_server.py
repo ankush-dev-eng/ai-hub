@@ -41,17 +41,25 @@ def get_video_pipeline():
     if VIDEO_PIPE is None:
         from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
         print("⚡ Loading damo-vilab/text-to-video-ms-1.7b onto T4 GPU...")
-        pipe = DiffusionPipeline.from_pretrained(
-            "damo-vilab/text-to-video-ms-1.7b",
-            torch_dtype=torch.float16,
-            variant="fp16"
-        )
+        try:
+            pipe = DiffusionPipeline.from_pretrained(
+                "damo-vilab/text-to-video-ms-1.7b",
+                torch_dtype=torch.float16,
+                low_cpu_mem_usage=True
+            )
+        except Exception:
+            pipe = DiffusionPipeline.from_pretrained(
+                "damo-vilab/text-to-video-ms-1.7b",
+                torch_dtype=torch.float16,
+                variant="fp16",
+                low_cpu_mem_usage=True
+            )
         pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
         pipe = pipe.to("cuda")
         if hasattr(pipe, "enable_vae_slicing"):
             try: pipe.enable_vae_slicing()
             except Exception: pass
-        elif hasattr(pipe, "vae") and hasattr(pipe.vae, "enable_slicing"):
+        if hasattr(pipe, "vae") and hasattr(pipe.vae, "enable_slicing"):
             try: pipe.vae.enable_slicing()
             except Exception: pass
         if hasattr(pipe, "vae") and hasattr(pipe.vae, "enable_tiling"):
@@ -65,14 +73,35 @@ def get_image_pipeline():
     free_video_pipeline()
     if IMAGE_PIPE is None:
         from diffusers import AutoPipelineForText2Image
-        print("⚡ Loading stabilityai/sdxl-turbo onto T4 GPU...")
-        pipe = AutoPipelineForText2Image.from_pretrained(
-            "stabilityai/sdxl-turbo",
-            torch_dtype=torch.float16,
-            variant="fp16"
-        )
-        pipe = pipe.to("cuda")
-        IMAGE_PIPE = pipe
+        print("⚡ Loading diffusion pipeline on T4 GPU...")
+        loaded_pipe = None
+        models_to_try = [
+            ("stabilityai/sdxl-turbo", False),
+            ("stabilityai/sd-turbo", False),
+            ("runwayml/stable-diffusion-v1-5", False)
+        ]
+        for m_name, use_fp16 in models_to_try:
+            try:
+                print(f"Attempting to load {m_name}...")
+                kw = {"torch_dtype": torch.float16, "low_cpu_mem_usage": True}
+                if use_fp16:
+                    kw["variant"] = "fp16"
+                loaded_pipe = AutoPipelineForText2Image.from_pretrained(
+                    m_name,
+                    **kw
+                )
+                loaded_pipe = loaded_pipe.to("cuda")
+                if hasattr(loaded_pipe, "enable_attention_slicing"):
+                    try: loaded_pipe.enable_attention_slicing()
+                    except Exception: pass
+                print(f"✅ {m_name} loaded successfully on T4 GPU!")
+                break
+            except Exception as e:
+                print(f"Notice: {m_name} load error ({e}), trying fallback...")
+                continue
+        if loaded_pipe is None:
+            raise RuntimeError("Could not initialize diffusion pipeline on GPU.")
+        IMAGE_PIPE = loaded_pipe
     return IMAGE_PIPE
 
 @app.get("/")
@@ -119,13 +148,20 @@ class ImageGenRequest(BaseModel):
 def generate_image(req: ImageGenRequest):
     try:
         pipe = get_image_pipeline()
-        img = pipe(prompt=req.prompt, num_inference_steps=max(1, min(req.num_inference_steps, 4)), guidance_scale=0.0).images[0]
+        steps = max(1, min(req.num_inference_steps, 4))
+        name = getattr(pipe, "_name_or_path", "").lower()
+        if "turbo" in name:
+            img = pipe(prompt=req.prompt, num_inference_steps=steps, guidance_scale=0.0).images[0]
+        else:
+            img = pipe(prompt=req.prompt, num_inference_steps=20, guidance_scale=7.5).images[0]
         if (img.width, img.height) != (req.width, req.height):
             img = img.resize((req.width, req.height), Image.Resampling.LANCZOS)
         buf = io.BytesIO()
         img.save(buf, format="WEBP", quality=92)
         return Response(content=buf.getvalue(), media_type="image/webp")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 class VideoGenRequest(BaseModel):

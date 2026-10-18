@@ -352,6 +352,143 @@ def dl_btn(*args, **kwargs):
 def show_image(*args, **kwargs):
     return _stretch(st.image, *args, **kwargs)
 
+def render_media_export_card(data_bytes: bytes, media_type: str, default_filename: str, key_prefix: str, clear_keys: list = None):
+    """Dedicated Export & Save Station for photos, videos, and music.
+    Provides custom filename input, format converter (PNG/JPG/WEBP),
+    direct browser download, and 1-click save to any custom folder on disk."""
+    if not data_bytes:
+        return
+
+    with st.container(key=f"export_card_{key_prefix}"):
+        st.markdown(
+            f"""
+            <div style="margin-top: 0.8rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;">
+                <span style="font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #a5b4fc;">
+                    💾 Download & Save Anywhere
+                </span>
+                <span style="font-size: 0.75rem; color: #94a3b8;">
+                    {len(data_bytes) / 1024:.1f} KB
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        col_name, col_fmt = st.columns([2.5, 1.5], gap="small")
+        with col_name:
+            custom_name = st.text_input(
+                "File Name (without extension):",
+                value=st.session_state.get(f"{key_prefix}_filename", default_filename),
+                key=f"{key_prefix}_input_fname"
+            ).strip()
+            if not custom_name:
+                custom_name = default_filename
+
+        final_bytes = data_bytes
+        chosen_ext = ""
+        mime_type = ""
+
+        with col_fmt:
+            if media_type == "image":
+                fmt_choice = st.selectbox(
+                    "Format:",
+                    ["PNG (.png)", "JPEG (.jpg)", "WEBP (.webp)"],
+                    index=0,
+                    key=f"{key_prefix}_fmt_select"
+                )
+                if "PNG" in fmt_choice:
+                    chosen_ext = "png"
+                    mime_type = "image/png"
+                    try:
+                        p_img = Image.open(io.BytesIO(data_bytes))
+                        buf = io.BytesIO()
+                        p_img.save(buf, format="PNG")
+                        final_bytes = buf.getvalue()
+                    except Exception:
+                        final_bytes = data_bytes
+                elif "JPEG" in fmt_choice:
+                    chosen_ext = "jpg"
+                    mime_type = "image/jpeg"
+                    try:
+                        p_img = Image.open(io.BytesIO(data_bytes)).convert("RGB")
+                        buf = io.BytesIO()
+                        p_img.save(buf, format="JPEG", quality=95)
+                        final_bytes = buf.getvalue()
+                    except Exception:
+                        final_bytes = data_bytes
+                else:
+                    chosen_ext = "webp"
+                    mime_type = "image/webp"
+                    try:
+                        p_img = Image.open(io.BytesIO(data_bytes))
+                        buf = io.BytesIO()
+                        p_img.save(buf, format="WEBP", quality=95)
+                        final_bytes = buf.getvalue()
+                    except Exception:
+                        final_bytes = data_bytes
+
+            elif media_type == "video":
+                st.selectbox("Format:", ["MP4 (.mp4)"], index=0, key=f"{key_prefix}_fmt_select")
+                chosen_ext = "mp4"
+                mime_type = "video/mp4"
+
+            elif media_type == "audio":
+                st.selectbox("Format:", ["WAV (.wav)"], index=0, key=f"{key_prefix}_fmt_select")
+                chosen_ext = "wav"
+                mime_type = "audio/wav"
+
+        full_filename = f"{custom_name}.{chosen_ext}"
+
+        # Target Folder Directory for 1-Click Save to Local Disk
+        default_dir = str(ROOT_DIR / "saved_media" / f"{media_type}s")
+        save_folder = st.text_input(
+            "Save to Local Folder (Path on Computer):",
+            value=st.session_state.get(f"{key_prefix}_save_folder", default_dir),
+            key=f"{key_prefix}_input_folder",
+            help="Specify where to save directly on your computer. Can be an absolute path (e.g. C:\\Users\\user\\Desktop) or a relative path."
+        ).strip()
+        if not save_folder:
+            save_folder = default_dir
+
+        c_dl_browser, c_save_disk, c_clear = st.columns([1.5, 1.5, 0.8], gap="small")
+        with c_dl_browser:
+            dl_btn(
+                label=f"⬇️ Download ({chosen_ext.upper()})",
+                data=final_bytes,
+                file_name=full_filename,
+                mime=mime_type,
+                type="primary",
+                key=f"{key_prefix}_dl_btn"
+            )
+
+        with c_save_disk:
+            if btn(f"💾 Save to Disk", key=f"{key_prefix}_save_disk_btn", help=f"Saves directly to {save_folder}"):
+                try:
+                    os.makedirs(save_folder, exist_ok=True)
+                    target_file_path = os.path.join(save_folder, full_filename)
+                    with open(target_file_path, "wb") as fp:
+                        fp.write(final_bytes)
+                    norm_path = os.path.normpath(target_file_path).replace("\\", "/")
+                    st.toast(f"✅ Saved to: {full_filename}")
+                    st.session_state[f"{key_prefix}_last_saved_path"] = norm_path
+                except Exception as save_err:
+                    st.error(f"Save failed: {save_err}")
+
+        with c_clear:
+            if btn("✕ Clear", key=f"{key_prefix}_clear_btn"):
+                if clear_keys:
+                    for k in clear_keys:
+                        st.session_state[k] = None
+                st.rerun()
+
+        last_saved = st.session_state.get(f"{key_prefix}_last_saved_path")
+        if last_saved and os.path.exists(last_saved):
+            ui(
+                f'<div style="margin-top: 6px; padding: 6px 10px; background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; font-size: 0.78rem; color: #86efac; display: flex; align-items: center; gap: 6px;">'
+                f'<span>✅</span><span><b>Saved to disk:</b> <code>{esc(last_saved)}</code></span>'
+                f'</div>'
+            )
+
 def pill(label: str, ok: bool, ok_text: str = "Ready", bad_text: str = "Add key") -> str:
     return (f'<span class="pill {"" if ok else "warn"}"><i></i>{esc(label)}'
             f'<em>{esc(ok_text if ok else bad_text)}</em></span>')
@@ -1403,7 +1540,7 @@ def generate_colab_video(colab_url: str, prompt: str, width: int = 512, height: 
         "duration": duration,
         "fps": 16
     }
-    with httpx.Client(timeout=240.0, follow_redirects=True) as client:
+    with httpx.Client(timeout=300.0, follow_redirects=True) as client:
         resp = client.post(f"{clean_url}/generate-video", json=payload)
         if resp.status_code != 200:
             err_msg = ""
@@ -1435,9 +1572,15 @@ def generate_colab_image(colab_url: str, prompt: str, width: int = 1024, height:
     if status_placeholder:
         status_placeholder.info(f"⚡ Connected to Colab GPU: Generating 1024x1024 diffusion visual on T4...")
     payload = {"prompt": prompt, "width": width, "height": height}
-    with httpx.Client(timeout=120.0, follow_redirects=True) as client:
+    with httpx.Client(timeout=300.0, follow_redirects=True) as client:
         resp = client.post(f"{clean_url}/generate-image", json=payload)
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            err_msg = ""
+            try:
+                err_msg = resp.json().get("detail", "")
+            except Exception:
+                err_msg = resp.text[:200]
+            raise Exception(f"Colab GPU Error ({resp.status_code}): {err_msg or 'Server error'}")
         content_type = resp.headers.get("content-type", "")
         if "image" in content_type or len(resp.content) > 10000:
             return resp.content
@@ -2725,14 +2868,26 @@ elif view == uikit.NAV[2]:
                         t0 = time.time()
                         try:
                             if is_colab_selected and st.session_state.colab_connected and "Colab" in model_choice:
-                                img_data = generate_colab_image(
-                                    st.session_state.colab_tunnel_url,
-                                    img_prompt,
-                                    width=w,
-                                    height=h,
-                                    status_placeholder=img_status_box
-                                )
-                                engine_tag = "Colab Dedicated T4 GPU"
+                                try:
+                                    img_data = generate_colab_image(
+                                        st.session_state.colab_tunnel_url,
+                                        img_prompt,
+                                        width=w,
+                                        height=h,
+                                        status_placeholder=img_status_box
+                                    )
+                                    engine_tag = "Colab Dedicated T4 GPU"
+                                except Exception as colab_err:
+                                    img_status_box.warning(f"⚡ Colab GPU notice ({colab_err}) — Auto-routing via Free Cloud GPU Cluster...")
+                                    img_data = generate_cloud_image_flux_or_horde(
+                                        img_prompt,
+                                        width=w,
+                                        height=h,
+                                        hf_token=hf_token,
+                                        engine_choice="✦ FLUX.1-schnell (Black Forest Labs Ultra-HD)",
+                                        status_placeholder=img_status_box
+                                    )
+                                    engine_tag = "Cloud GPU Cluster (Auto-Failover)"
                             else:
                                 img_data = generate_cloud_image_flux_or_horde(
                                     img_prompt,
@@ -2756,20 +2911,13 @@ elif view == uikit.NAV[2]:
                 uikit.media_card("image", gen_image, key="tab3_img_main")
                 st.caption(st.session_state.tab3_image_caption)
 
-                c_img_down, c_img_clear = st.columns([2, 1])
-                with c_img_down:
-                    dl_btn(
-                        label="↓ Download High-Res Image (.webp)",
-                        data=st.session_state.tab3_image_bytes,
-                        file_name=f"visual_{int(time.time())}.webp",
-                        mime="image/webp"
-                    )
-                with c_img_clear:
-                    if btn("✕ Clear Image"):
-                        st.session_state.tab3_image_bytes = None
-                        st.session_state.tab3_image_caption = None
-                        st.session_state.tab3_4k_upscaled = None
-                        st.rerun()
+                render_media_export_card(
+                    st.session_state.tab3_image_bytes,
+                    media_type="image",
+                    default_filename=f"visual_{int(time.time())}",
+                    key_prefix="tab3_img_main",
+                    clear_keys=["tab3_image_bytes", "tab3_image_caption", "tab3_4k_upscaled"]
+                )
 
                 if is_colab_selected and st.session_state.colab_connected and st.session_state.tab3_image_bytes:
                     st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
@@ -2784,7 +2932,13 @@ elif view == uikit.NAV[2]:
                     if st.session_state.get("tab3_4k_upscaled"):
                         uikit.media_card("image", Image.open(io.BytesIO(st.session_state.tab3_4k_upscaled)), key="tab3_img_4k")
                         st.caption("4096×4096 4K Ultra-HD Visual (Real-ESRGAN / Lanczos)")
-                        dl_btn("⬇️ Download 4K Visual (.jpg)", data=st.session_state.tab3_4k_upscaled, file_name=f"visual_4k_{int(time.time())}.jpg", mime="image/jpeg")
+                        render_media_export_card(
+                            st.session_state.tab3_4k_upscaled,
+                            media_type="image",
+                            default_filename=f"visual_4k_{int(time.time())}",
+                            key_prefix="tab3_img_4k",
+                            clear_keys=["tab3_4k_upscaled"]
+                        )
 
     # ---- Video Studio ----
     with vid_col:
@@ -2891,15 +3045,27 @@ elif view == uikit.NAV[2]:
                         t0 = time.time()
                         try:
                             if "Colab" in vid_engine and is_colab_selected and st.session_state.colab_connected:
-                                vid_bytes = generate_colab_video(
-                                    st.session_state.colab_tunnel_url,
-                                    vid_prompt,
-                                    width=vw,
-                                    height=vh,
-                                    duration=dur_val,
-                                    status_placeholder=vid_status_box
-                                )
-                                engine_tag = "Colab Dedicated T4 GPU (True Motion Diffusion)"
+                                try:
+                                    vid_bytes = generate_colab_video(
+                                        st.session_state.colab_tunnel_url,
+                                        vid_prompt,
+                                        width=vw,
+                                        height=vh,
+                                        duration=dur_val,
+                                        status_placeholder=vid_status_box
+                                    )
+                                    engine_tag = "Colab Dedicated T4 GPU (True Motion Diffusion)"
+                                except Exception as colab_err:
+                                    vid_status_box.warning(f"⚡ Colab video notice ({colab_err}) — Auto-synthesizing via Multi-Scene Storyboard Director...")
+                                    vid_bytes = synthesize_multiscene_video(
+                                        vid_prompt,
+                                        width=vw,
+                                        height=vh,
+                                        total_duration=dur_val,
+                                        hf_token=hf_token,
+                                        status_placeholder=vid_status_box
+                                    )
+                                    engine_tag = "Multi-Scene Storyboard Synthesizer (Auto-Failover)"
                             elif "Storyboard Director" in vid_engine and dur_val >= 10:
                                 vid_bytes = synthesize_multiscene_video(
                                     vid_prompt,
@@ -2950,19 +3116,13 @@ elif view == uikit.NAV[2]:
                 uikit.media_card("video", st.session_state.tab3_video_bytes, key="tab3_vid_main")
                 st.caption(st.session_state.tab3_video_caption)
 
-                c_vid_down, c_vid_clear = st.columns([2, 1])
-                with c_vid_down:
-                    dl_btn(
-                        label="↓ Download Video (.mp4)",
-                        data=st.session_state.tab3_video_bytes,
-                        file_name=f"cloud_video_{int(time.time())}.mp4",
-                        mime="video/mp4"
-                    )
-                with c_vid_clear:
-                    if btn("✕ Clear Video"):
-                        st.session_state.tab3_video_bytes = None
-                        st.session_state.tab3_video_caption = None
-                        st.rerun()
+                render_media_export_card(
+                    st.session_state.tab3_video_bytes,
+                    media_type="video",
+                    default_filename=f"cinematic_video_{int(time.time())}",
+                    key_prefix="tab3_vid_main",
+                    clear_keys=["tab3_video_bytes", "tab3_video_caption"]
+                )
 
             with st.expander("🌐 External Cloud Studios (For 4K Hollywood Studio Renders)", expanded=False):
                 st.markdown("""
@@ -3012,19 +3172,13 @@ elif view == uikit.NAV[2]:
         if st.session_state.tab3_audio_bytes:
             st.audio(st.session_state.tab3_audio_bytes, format="audio/wav")
             st.caption(st.session_state.tab3_audio_caption)
-            c_aud_dl, c_aud_cl = st.columns([2, 1])
-            with c_aud_dl:
-                dl_btn(
-                    label="↓ Download Audio (.wav)",
-                    data=st.session_state.tab3_audio_bytes,
-                    file_name=f"soundtrack_{int(time.time())}.wav",
-                    mime="audio/wav"
-                )
-            with c_aud_cl:
-                if btn("✕ Clear Audio"):
-                    st.session_state.tab3_audio_bytes = None
-                    st.session_state.tab3_audio_caption = None
-                    st.rerun()
+            render_media_export_card(
+                st.session_state.tab3_audio_bytes,
+                media_type="audio",
+                default_filename=f"soundtrack_{int(time.time())}",
+                key_prefix="tab3_aud_main",
+                clear_keys=["tab3_audio_bytes", "tab3_audio_caption"]
+            )
 
 # ===================================================
 # TAB 4: DEPLOYMENT & FREE AI GUIDE
@@ -3282,13 +3436,4 @@ elif view == uikit.NAV[3]:
           All inference runs on remote cloud hardware (Google TPU, Groq LPU, OpenRouter, FLUX Cloud, Storyboard Director). Your laptop's RTX 5060 remains at **0% load and ~40°C**, completely preventing thermal sirens or power overdraw.
         """)
 
-# GetLayers interactive motion, cursor spring, canvas constellation & command palette
-FX_JS_PATH = Path(__file__).parent / "src" / "studio_fx.js"
-if FX_JS_PATH.exists():
-    with open(FX_JS_PATH, "r", encoding="utf-8") as f:
-        fx_code = f.read()
-    try:
-        import streamlit.components.v1 as components
-        components.html(f"<script>{fx_code}</script>", height=0)
-    except Exception:
-        pass
+
