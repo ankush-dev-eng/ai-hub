@@ -1,0 +1,28 @@
+[project]
+name = "hackathon-ai-hub"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "ankush-dev-eng", email = "ankushdesktop143@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "google-genai>=2.31.0",
+    "gradio-client>=2.7.2",
+    "groq>=1.7.0",
+    "huggingface-hub>=2.2.0",
+    "imageio[ffmpeg]>=2.38.1",
+    "mcp>=2.3.0",
+    "openai>=3.33.0",
+    "pillow>=12.3.0",
+    "python-dotenv>=1.2.4",
+    "streamlit>=1.66.0",
+]
+
+[project.scripts]
+hackathon-ai-hub = "hackathon_ai_hub:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"

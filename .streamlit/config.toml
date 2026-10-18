@@ -1,0 +1,17 @@
+[browser]
+gatherUsageStats = false
+
+[server]
+runOnSave = true
+headless = true
+
+[client]
+toolbarMode = "developer"
+
+[theme]
+base = "dark"
+primaryColor = "#6366f1"
+backgroundColor = "#08090c"
+secondaryBackgroundColor = "#0d0f14"
+textColor = "#f1f5f9"
+font = "sans serif"
