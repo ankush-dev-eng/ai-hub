@@ -18,6 +18,10 @@ venv/
 
 # Session Cache & Local User Logs
 data/sessions/
+saved_media/
 *.log
+*.tmp
+.pytest_cache/
 .system_generated/
 .colab_tunnel_cache.txt
+

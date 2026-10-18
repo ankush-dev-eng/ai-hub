@@ -88,8 +88,6 @@ def hero_html(providers: Sequence[tuple[str, bool]], pills_html: str = "") -> st
       <div class="hx-copy">
         <div class="hx-chip">
           <span class="dot live"></span>Cloud inference • 0% local GPU load
-          <span style="margin: 0 4px; opacity: 0.4;">|</span>
-          <span role="button" tabindex="0" class="fx-cmd-pill" data-action="open-palette" style="color:var(--cyan); text-decoration:none; font-weight:600; cursor:pointer;" title="Open Command Palette (Ctrl+K)">⌘K Quick Search</span>
         </div>
         <div class="hx-title" role="heading" aria-level="1">Pitch it. Audit it. <span style="white-space:nowrap;">Render it.</span></div>
         <p class="hx-sub">High-velocity multimodal workspace for AI prototyping. 100% free cloud models (Gemini, Groq, OpenRouter DeepSeek-R1, FLUX & Multi-Scene Video) with zero card requirement.</p>

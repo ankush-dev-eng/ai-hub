@@ -13,7 +13,7 @@
 (function () {
   try {
     var host = window.parent, doc = host.document, root = doc.documentElement;
-    var VER = 'fx-v5';
+    var VER = 'fx-v6';
     if (host.__studioFx && host.__studioFx.ver === VER) return;
     if (host.__studioFx && typeof host.__studioFx.destroy === 'function') host.__studioFx.destroy();
 
@@ -38,11 +38,25 @@
     var reduced = host.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var coarse = host.matchMedia('(pointer: coarse)').matches;
     function fxOff() { return lite() || reduced; }
-
     /* ---------- State ---------- */
     var mx = -200, my = -200, rx = -200, ry = -200, ticking = false, ready = false;
     var dot = mk('div', 'fx-cursor-dot'), ring = mk('div', 'fx-cursor-ring');
     var bar = mk('div', 'fx-progress');
+    var downBtn = mk('button', 'fx-scroll-bottom-btn');
+    downBtn.id = 'fx-scroll-bottom-btn';
+    downBtn.setAttribute('aria-label', 'Scroll to bottom');
+    downBtn.setAttribute('title', 'Jump to latest response');
+    downBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>';
+    on(downBtn, 'click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var scroller = doc.querySelector('[data-testid="stMain"]') || doc.querySelector('section.main') || doc.scrollingElement || doc.body;
+      if (scroller) {
+        scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+      }
+      var ta = doc.querySelector('[data-testid="stChatInputTextArea"]');
+      if (ta) ta.focus();
+    });
 
     /* ---------- Cursor Spring Loop ---------- */
     function frame() {
@@ -173,8 +187,23 @@
       var t = e.target === doc ? doc.scrollingElement : e.target;
       if (!t || !t.scrollHeight) return;
       var max = t.scrollHeight - t.clientHeight; 
-      if (max < 40) return;
-      bar.style.transform = 'scaleX(' + Math.min(1, t.scrollTop / max).toFixed(4) + ')';
+      if (max >= 40) {
+        bar.style.transform = 'scaleX(' + Math.min(1, t.scrollTop / max).toFixed(4) + ')';
+      }
+
+      // 1. Floating Claude/ChatGPT-style Down-Arrow Jump to Latest (centered over prompt dock)
+      var chatInp = doc.querySelector('[data-testid="stChatInput"]');
+      var msgs = doc.querySelectorAll('[data-testid="stChatMessage"]');
+      var distFromBottom = t.scrollHeight - t.scrollTop - t.clientHeight;
+      if (chatInp && msgs.length > 0 && distFromBottom > 220 && t.scrollTop > 80) {
+        var cr = chatInp.getBoundingClientRect();
+        if (cr.width > 0) {
+          downBtn.style.left = (cr.left + cr.width / 2) + 'px';
+        }
+        downBtn.classList.add('visible');
+      } else {
+        downBtn.classList.remove('visible');
+      }
     }, { capture: true, passive: true });
 
     /* ---------- Interactive Chat Checklists & Task Persistence ---------- */
@@ -236,12 +265,12 @@
 
     function checkFullscreen() {
       var fsFrame = doc.querySelector('[data-testid="stFullScreenFrame"]');
-      var isFs = !!fsFrame || !!doc.querySelector('button[aria-label*="Close fullscreen"], button[title*="Exit fullscreen" i], button[title*="close fullscreen" i]');
+      var isFs = !!fsFrame;
       doc.body.classList.toggle('in-fullscreen', isFs);
       root.classList.toggle('in-fullscreen', isFs);
 
       var existingExitBtn = doc.getElementById('studio-exit-fs-pill');
-      if (fsFrame || isFs) {
+      if (fsFrame) {
         if (!existingExitBtn) {
           var btn = doc.createElement('button');
           btn.id = 'studio-exit-fs-pill';
@@ -251,7 +280,7 @@
           btn.onclick = function(e) {
             e.preventDefault();
             e.stopPropagation();
-            var nativeBtn = doc.querySelector('[data-testid="stFullScreenFrame"] button, button[aria-label*="Close fullscreen"], button[title*="Exit fullscreen" i], button[title*="close fullscreen" i]');
+            var nativeBtn = doc.querySelector('[data-testid="stFullScreenFrame"] button');
             if (nativeBtn) {
               nativeBtn.click();
             } else {
@@ -288,6 +317,19 @@
       return doc.documentElement || doc.body;
     }
 
+    var userIsScrolling = false;
+    var userScrollTimer = null;
+    on(doc, 'wheel', function() {
+      userIsScrolling = true;
+      if (userScrollTimer) host.clearTimeout(userScrollTimer);
+      userScrollTimer = host.setTimeout(function() { userIsScrolling = false; }, 1200);
+    }, { passive: true });
+    on(doc, 'touchmove', function() {
+      userIsScrolling = true;
+      if (userScrollTimer) host.clearTimeout(userScrollTimer);
+      userScrollTimer = host.setTimeout(function() { userIsScrolling = false; }, 1200);
+    }, { passive: true });
+
     function isNearBottom(scroller) {
       if (!scroller) return true;
       var diff = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
@@ -295,6 +337,7 @@
     }
 
     function autoScrollChat(force) {
+      if (userIsScrolling && !force) return;
       var msgs = doc.querySelectorAll('[data-testid="stChatMessage"]');
       if (msgs.length === 0) return;
       var currentTab = root.getAttribute('data-tab');
@@ -341,18 +384,10 @@
       syncTab(); 
       startHero(); 
       checkFullscreen();
-      autoScrollChat(false);
     }
 
     var mo = new host.MutationObserver(function (mutations) {
       if (!queued) { queued = true; host.requestAnimationFrame(refresh); }
-      for (var i = 0; i < mutations.length; i++) {
-        var target = mutations[i].target;
-        if (target && target.nodeType === 1 && target.closest && target.closest('[data-testid="stChatMessage"]')) {
-          autoScrollChat(false);
-          break;
-        }
-      }
     });
     mo.observe(doc.body, { childList: true, subtree: true, characterData: true });
     
@@ -473,80 +508,8 @@
       target.click();
     }
 
-    /* ---------- Command Palette (Ctrl+K / Cmd+K) ---------- */
-    var back = mk('div', 'fx-pal-back'), pal = mk('div', 'fx-pal', back);
-    var inp = doc.createElement('input'), list = doc.createElement('ul');
-    inp.placeholder = 'Type to search commands or switch tabs... (Esc to close)'; 
-    inp.setAttribute('aria-label', 'Command palette'); 
-    pal.appendChild(inp); 
-    pal.appendChild(list);
-
-    var sel = 0, shown = [];
-    function clickText(sel_, text) { 
-      var el = $$(sel_).filter(function (n) { return (n.textContent || '').toLowerCase().indexOf(text) > -1; })[0]; 
-      if (el) el.click(); 
-      return !!el; 
-    }
-
-    var CMDS = [
-      { t: '⚡ Conversational Studio (Chat & Architecture)', k: '1', f: function () { selectTab(0); } },
-      { t: '◈ Visual & Document Auditor (Multi-File)', k: '2', f: function () { selectTab(1); } },
-      { t: '✦ Free Image & Video Studio (1024px & 30s MP4)', k: '3', f: function () { selectTab(2); } },
-      { t: '↗ Deployment & Cloud AI Guide', k: '4', f: function () { selectTab(3); } },
-      { t: '✦ New Chat Session', k: 'N', f: function () { clickText('button', 'new chat'); } },
-      { t: '💬 Focus Chat Prompt', k: '/', f: function () { var ta = $('[data-testid="stChatInput"] textarea'); ta && ta.focus(); } },
-      { t: '↻ Clear App Cache', k: 'C', f: function () { clickText('button', 'clear cache'); } },
-      { t: '⚡ Toggle Lite Effects (0% GPU)', k: 'L', f: function () { clickText('label', 'lite effects'); } }
-    ];
-
-    function render() {
-      var q = inp.value.toLowerCase().trim(); 
-      shown = CMDS.filter(function (c) { return c.t.toLowerCase().indexOf(q) > -1; });
-      if (sel >= shown.length) sel = 0; 
-      list.innerHTML = '';
-      shown.forEach(function (c, i) {
-        var li = doc.createElement('li'); 
-        li.className = i === sel ? 'sel' : ''; 
-        li.innerHTML = '<span></span><small></small>';
-        li.firstChild.textContent = c.t; 
-        li.lastChild.textContent = c.k;
-        li.addEventListener('mousedown', function (e) { 
-          e.preventDefault(); 
-          run(c); 
-        }); 
-        list.appendChild(li);
-      });
-    }
-
-    function run(c) { 
-      close(); 
-      host.setTimeout(c.f, 40); 
-    }
-    
-    function open() { 
-      back.classList.add('open'); 
-      inp.value = ''; 
-      sel = 0; 
-      render(); 
-      host.setTimeout(function () { inp.focus(); }, 25); 
-    }
-    
-    function close() { 
-      back.classList.remove('open'); 
-    }
-
-    on(back, 'mousedown', function (e) { 
-      if (e.target === back) close(); 
-    });
-
+    /* ---------- Selectbox & Dropdown helpers ---------- */
     on(doc, 'click', function (e) {
-      var pill = e.target && e.target.closest ? e.target.closest('.fx-cmd-pill, [data-action="open-palette"]') : null;
-      if (pill) {
-        e.preventDefault();
-        e.stopPropagation();
-        open();
-        return;
-      }
       var comboInp = e.target && e.target.closest ? e.target.closest('.react-aria-ComboBox input, [role="combobox"]') : null;
       if (comboInp) {
         var combo = comboInp.closest('.react-aria-ComboBox');
@@ -556,41 +519,10 @@
         }
       }
     });
-    
-    on(inp, 'input', render);
-    on(inp, 'keydown', function (e) {
-      if (e.key === 'ArrowDown') { 
-        sel = Math.min(sel + 1, shown.length - 1); 
-        render(); 
-        e.preventDefault(); 
-      } else if (e.key === 'ArrowUp') { 
-        sel = Math.max(sel - 1, 0); 
-        render(); 
-        e.preventDefault(); 
-      } else if (e.key === 'Enter') { 
-        if (shown[sel]) run(shown[sel]); 
-        e.preventDefault(); 
-      } else if (e.key === 'Escape') { 
-        close(); 
-      }
-    });
 
     function handleKey(e) {
       var t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-      var code = e.code || '';
-      var isK = (e.key === 'k' || e.key === 'K' || code === 'KeyK');
-      if ((e.ctrlKey || e.metaKey) && isK) { 
-        e.preventDefault(); 
-        e.stopPropagation();
-        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-        back.classList.contains('open') ? close() : open(); 
-        return; 
-      }
       if (e.key === 'Escape') {
-        if (back.classList.contains('open')) { 
-          close(); 
-          return; 
-        }
         var customPill = doc.getElementById('studio-exit-fs-pill');
         if (customPill) {
           e.preventDefault();
@@ -610,7 +542,7 @@
           return;
         }
       }
-      if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey && !back.classList.contains('open')) {
+      if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
         var ta = $('[data-testid="stChatInput"] textarea'); 
         if (ta) { e.preventDefault(); ta.focus(); }
       }
@@ -629,8 +561,6 @@
 
     host.__studioFx = {
       ver: VER,
-      openPalette: open,
-      closePalette: close,
       selectTab: selectTab,
       destroy: function () {
         cleanups.forEach(function (f) { try { f(); } catch (e) { } });

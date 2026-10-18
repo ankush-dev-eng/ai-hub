@@ -82,12 +82,19 @@ html[data-tab="3"] { --a1: #34d399; --a2: #22d3ee; }   /* Tab 4 (Deploy): Emeral
   z-index: 1;
 }
 
-/* ---------- Streamlit Header: Clean subtle backdrop ---------- */
-header[data-testid="stHeader"] {
-  background: rgba(8, 9, 13, 0.8) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  backdrop-filter: blur(12px) !important;
+/* ---------- Streamlit Header: Clean subtle backdrop across all scroll positions ---------- */
+header[data-testid="stHeader"],
+[data-testid="stHeader"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 3.75rem !important;
+  z-index: 100000 !important;
+  background: rgba(10, 12, 20, 0.45) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
 }
 
 .stTabs [data-baseweb="tab"],
@@ -327,82 +334,7 @@ ul.contains-task-list li.task-completed {
 
 
 /* ---------- Command Palette (Ctrl+K / Cmd+K) ---------- */
-.fx-pal-back {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483100;
-  background: rgba(4, 5, 9, 0.72);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  display: none;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 13vh;
-}
-
-.fx-pal-back.open {
-  display: flex;
-  animation: palIn 0.2s var(--ease);
-}
-
-@keyframes palIn {
-  from { opacity: 0; transform: scale(0.98) translateY(-8px); }
-  to { opacity: 1; transform: none; }
-}
-
-.fx-pal {
-  width: min(580px, 92vw);
-  border-radius: 16px;
-  overflow: hidden;
-  background: rgba(14, 16, 24, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.95), 0 0 0 1px color-mix(in srgb, var(--a1) 32%, transparent), 0 0 60px -20px var(--a1);
-}
-
-.fx-pal input {
-  width: 100%;
-  padding: 16px 20px;
-  background: transparent;
-  border: 0;
-  outline: 0;
-  color: #f1f5f9;
-  font: 500 15px 'Inter', sans-serif;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fx-pal ul {
-  list-style: none;
-  margin: 0;
-  padding: 8px;
-  max-height: 330px;
-  overflow-y: auto;
-}
-
-.fx-pal li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 11px 14px;
-  border-radius: 10px;
-  color: #cbd5e1;
-  font: 500 13.5px 'Inter', sans-serif;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-
-.fx-pal li small {
-  color: #64748b;
-  font: 600 11px var(--mono);
-  background: rgba(255, 255, 255, 0.06);
-  padding: 2px 7px;
-  border-radius: 5px;
-}
-
-.fx-pal li:hover,
-.fx-pal li.sel {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--a1) 28%, transparent), color-mix(in srgb, var(--a2) 16%, transparent));
-  color: #ffffff;
-}
+/* Command Palette removed per user request */
 
 /* ---------- Spotlight Border-Beam Cards (GetLayers Style) ---------- */
 .fx-card {
@@ -681,10 +613,34 @@ ul.contains-task-list li.task-completed {
 
 /* ---------- 3D Perspective Tilt & Contained Media Cards ---------- */
 [data-testid="stImage"] {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: inline-flex !important;
+  position: relative !important;
+  width: fit-content !important;
+  max-width: 100% !important;
   margin: 0.8rem 0;
+}
+
+[data-testid="stImage"] > div {
+  position: relative !important;
+  width: fit-content !important;
+  display: inline-block !important;
+}
+
+[data-testid="stImage"] .stImageHoverButton,
+[data-testid="stImage"] [data-testid="StyledFullScreenButton"] {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  left: auto !important;
+  z-index: 25 !important;
+  opacity: 0.85 !important;
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+}
+
+[data-testid="stImage"]:hover .stImageHoverButton,
+[data-testid="stImage"]:hover [data-testid="StyledFullScreenButton"] {
+  opacity: 1 !important;
+  transform: scale(1.05) !important;
 }
 
 [data-testid="stImage"] img {
@@ -938,9 +894,65 @@ img[src*="avatar_assistant"] {
   background: rgba(7, 8, 13, 0.98) !important;
 }
 
-.in-fullscreen header[data-testid="stHeader"],
-body:has([data-testid="stFullScreenFrame"]) header[data-testid="stHeader"] {
-  display: none !important;
+/* Ensure Streamlit header, deploy toolbar, and sidebar expand/collapse controls never disappear */
+header[data-testid="stHeader"],
+[data-testid="stHeader"] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 999 !important;
+  background: transparent !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+[data-testid="stToolbar"] {
+  pointer-events: none !important;
+}
+
+[data-testid="stToolbarActions"],
+[data-testid="stToolbar"] > *,
+[data-testid="stMainMenuButton"],
+button[data-testid="stBaseButton-header"] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 1000 !important;
+  pointer-events: auto !important;
+}
+
+section[data-testid="stSidebar"] {
+  z-index: 9999 !important;
+}
+
+[data-testid="stSidebarCollapseButton"] {
+  z-index: 10002 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+}
+
+[data-testid="stSidebarCollapseButton"] button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"] {
+  position: fixed !important;
+  top: 1rem !important;
+  left: 1rem !important;
+  z-index: 10002 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+  background: rgba(18, 22, 34, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
 }
 
 [data-testid="stFullScreenFrame"] button,
@@ -994,23 +1006,30 @@ div[role="dialog"] button[aria-label="Close"]:hover,
 /* =====================================================================
    Studio Segmented Tab Switching Interface
    ===================================================================== */
-.st-key-nav_wrapper,
+[data-testid="stLayoutWrapper"]:has(.st-key-nav_wrapper),
 [data-testid="stElementContainer"]:has(.st-key-nav_wrapper),
+[data-testid="stLayoutWrapper"]:has(.st-key-hub_nav_segmented),
 [data-testid="stElementContainer"]:has(.st-key-hub_nav_segmented),
-[data-testid="stElementContainer"]:has(.st-key-hub_nav_radio),
-.st-key-nav,
-[data-testid="stElementContainer"]:has(.st-key-nav) {
+[data-testid="stLayoutWrapper"]:has(.st-key-hub_nav_radio),
+[data-testid="stElementContainer"]:has(.st-key-hub_nav_radio) {
+  display: contents !important;
+}
+
+.st-key-nav_wrapper,
+.st-key-hub_nav_segmented,
+.st-key-hub_nav_radio,
+.st-key-nav {
   position: sticky !important;
   top: 3.75rem !important;
   z-index: 990 !important;
   width: 100% !important;
-  background: rgba(8, 9, 14, 0.95) !important;
-  backdrop-filter: blur(24px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-  padding: 0.65rem 0 !important;
-  margin: 0 0 1.5rem 0 !important;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.75) !important;
+  background: rgba(10, 12, 20, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  padding: 0.2rem 0 !important;
+  margin: 0 0 0.75rem 0 !important;
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.35) !important;
 }
 
 div[data-testid="stSegmentedControl"],
@@ -1020,11 +1039,11 @@ div[data-testid="stSegmentedControl"],
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
-  background: rgba(18, 21, 31, 0.85) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 16px !important;
-  padding: 4px !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  background: rgba(14, 17, 26, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 14px !important;
+  padding: 3px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.25) !important;
 }
 
 div[data-testid="stSegmentedControl"] button {
@@ -1143,3 +1162,49 @@ div[data-testid="stSegmentedControl"] button[data-active="true"] {
   color: #ffffff !important;
   font-weight: 600 !important;
 }
+
+/* Claude / ChatGPT-style Floating Down-Arrow Button */
+.fx-scroll-bottom-btn {
+  position: fixed !important;
+  bottom: 5.85rem !important;
+  left: 50% !important;
+  transform: translate(-50%, 10px) scale(0.9) !important;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 50% !important;
+  background: rgba(18, 22, 34, 0.94) !important;
+  border: 1px solid rgba(99, 102, 241, 0.5) !important;
+  color: #38bdf8 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 15px rgba(99, 102, 241, 0.35) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  cursor: pointer !important;
+  z-index: 998 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease !important;
+  pointer-events: none !important;
+}
+
+.fx-scroll-bottom-btn.visible {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translate(-50%, 0) scale(1) !important;
+  pointer-events: auto !important;
+}
+
+.fx-scroll-bottom-btn:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(34, 211, 238, 0.35)) !important;
+  color: #ffffff !important;
+  border-color: rgba(34, 211, 238, 0.8) !important;
+  transform: translate(-50%, -2px) scale(1.08) !important;
+  box-shadow: 0 8px 25px rgba(34, 211, 238, 0.45) !important;
+}
+
+.fx-scroll-bottom-btn:active {
+  transform: translate(-50%, 1px) scale(0.96) !important;
+}
+

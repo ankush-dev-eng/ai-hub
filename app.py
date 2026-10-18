@@ -90,7 +90,27 @@ STUDIO_CSS = """
     var(--bg);
   color:var(--text); font-family:var(--font); color-scheme:dark;
 }
-[data-testid="stHeader"]{background:transparent}
+header[data-testid="stHeader"],
+[data-testid="stHeader"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 3.75rem !important;
+  z-index: 100000 !important;
+  background: transparent !important;
+  border-bottom: none !important;
+  pointer-events: none !important;
+}
+[data-testid="stToolbar"] {
+  pointer-events: none !important;
+}
+[data-testid="stToolbarActions"],
+[data-testid="stToolbar"] > *,
+[data-testid="stMainMenuButton"],
+button[data-testid="stBaseButton-header"] {
+  pointer-events: auto !important;
+}
 footer{visibility:hidden}
 .block-container,[data-testid="stMainBlockContainer"]{max-width:1280px;padding-top:2rem;padding-bottom:4rem}
 .stApp p,.stApp label,.stApp li,.stApp button,.stApp input,.stApp textarea{font-family:var(--font)}
@@ -178,8 +198,10 @@ div[data-baseweb="input"]:focus-within,div[data-baseweb="textarea"]:focus-within
 .stTabs [data-baseweb="tab-border"]{display:none}
 
 /* ---------- Sidebar ---------- */
-section[data-testid="stSidebar"]{background:var(--bg-elev);border-right:1px solid var(--border)}
-section[data-testid="stSidebar"][aria-expanded="true"]{min-width:320px !important;max-width:320px !important;width:320px !important}
+section[data-testid="stSidebar"]{background:var(--bg-elev);border-right:1px solid var(--border);z-index:9999 !important}
+[data-testid="stSidebarCollapseButton"]{z-index:10002 !important;pointer-events:auto !important;display:flex !important}
+[data-testid="stSidebarCollapseButton"] button{pointer-events:auto !important;cursor:pointer !important;display:flex !important;opacity:1 !important;visibility:visible !important}
+[data-testid="stExpandSidebarButton"]{position:fixed !important;top:1rem !important;left:1rem !important;z-index:10002 !important;pointer-events:auto !important;display:flex !important;background:rgba(18,22,34,0.9) !important;border:1px solid rgba(255,255,255,0.15) !important;border-radius:8px !important;box-shadow:0 4px 12px rgba(0,0,0,0.4) !important}
 .brand{display:flex;align-items:center;gap:.7rem;margin:.2rem 0 1rem}
 .brand-mark{
   width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:1.05rem;flex:none;
@@ -622,8 +644,8 @@ def generate_cloud_image_flux_or_horde(prompt: str, width: int = 1024, height: i
     with automatic failover to Stable Horde. 100% Free, Zero Card, Zero 402 payment errors."""
     prompt = enrich_prompt_for_visuals(prompt)
     
-    # Direct Pollinations if user selected Pollinations
-    if "Pollinations" in engine_choice:
+    # Direct Pollinations if user selected Pollinations or if HF token is missing
+    if "Pollinations" in engine_choice or not hf_token:
         if status_placeholder:
             status_placeholder.info("🚀 Generating 1024px visual via Pollinations Cloud FLUX...")
         enc_prompt = urllib.parse.quote(prompt)
@@ -1081,111 +1103,105 @@ def generate_cinematic_soundtrack(prompt: str, duration_sec: float = 4.0, sample
     """Synthesizes high-fidelity, multi-genre polyphonic stereo music matching any natural language prompt."""
     import numpy as np, wave, io
     dur = max(1.0, float(duration_sec))
-    t = np.linspace(0, dur, int(sample_rate * dur), endpoint=False)
-    p = prompt.lower()
+    num_samples = int(sample_rate * dur)
+    t = np.linspace(0, dur, num_samples, endpoint=False)
+    p = (prompt or "cinematic soundtrack").lower()
 
-    # 1. Classify style, tempo & harmonic chord progression
-    if any(k in p for k in ['saiyara', 'bollywood', 'hindi', 'romantic', 'love', 'melody', 'melodious', 'indian', 'desi', 'acoustic', 'flute', 'bansuri', 'sitar', 'violin', 'strings', 'emotional', 'serenade', 'song', 'heart', 'soul', 'acoustic guitar']):
-        style = 'romantic'
-        bpm = 74.0
+    # 1. Emotional and Genre Classification
+    is_romantic = any(k in p for k in ['saiyara', 'bollywood', 'hindi', 'romantic', 'love', 'melody', 'melodious', 'indian', 'desi', 'acoustic', 'flute', 'bansuri', 'sitar', 'strings', 'emotional', 'serenade', 'heart', 'soul'])
+    is_gaming = any(k in p for k in ['gaming', 'free fire', 'game', 'battle', 'combat', 'boss', 'k character', 'action', 'rush', 'war', 'fight', 'gun'])
+    is_edm = any(k in p for k in ['edm', 'dance', 'techno', 'house', 'rave', 'club', 'drop', 'dj', 'remix'])
+    is_trap = any(k in p for k in ['trap', 'hiphop', 'hip hop', 'rap', '808', 'drill', 'freestyle'])
+    is_piano = any(k in p for k in ['piano', 'classical', 'ballad', 'melancholy', 'sad', 'keys', 'grand'])
+    is_cyber = any(k in p for k in ['cyberpunk', 'synthwave', '80s', 'retro', 'neon', 'synth', 'future'])
+    is_space = any(k in p for k in ['space', 'cosmic', 'galaxy', 'ambient', 'stars', 'deep', 'nebula', 'meditation', 'calm', 'peaceful', 'relax', 'sleep', 'nature', 'ocean'])
+    is_lofi = any(k in p for k in ['lofi', 'chill', 'lo-fi', 'warm', 'rhodes', 'study', 'rain', 'mellow'])
+    is_rock = any(k in p for k in ['rock', 'metal', 'punk', 'heavy', 'riff', 'guitar'])
+
+    # Determine Style, BPM, and Harmonic Progression
+    if is_romantic:
+        style = 'romantic'; bpm = 75.0
         chords = [
-            [164.81, 196.00, 246.94, 293.66, 370.00], # Em9
-            [130.81, 164.81, 196.00, 246.94, 329.63], # Cmaj7
-            [98.00, 146.83, 196.00, 246.94, 293.66],  # Gmaj9
-            [146.83, 185.00, 220.00, 293.66, 370.00]  # Dadd9
+            [164.81, 196.00, 246.94, 293.66], # Em7
+            [130.81, 164.81, 196.00, 246.94], # Cmaj7
+            [98.00, 146.83, 196.00, 246.94],  # Gmaj
+            [146.83, 185.00, 220.00, 293.66]  # Dadd9
         ]
-    elif any(k in p for k in ['gaming', 'free fire', 'game', 'battle', 'combat', 'boss', 'k character', 'action', 'rush', 'war', 'fight', 'gun']):
-        style = 'gaming'
-        bpm = 136.0
+    elif is_gaming:
+        style = 'gaming'; bpm = 132.0
         chords = [
             [146.83, 174.61, 220.00, 293.66], # Dm
             [116.54, 146.83, 174.61, 233.08], # Bb
             [98.00, 116.54, 146.83, 196.00],  # Gm
             [110.00, 138.59, 164.81, 220.00]  # A
         ]
-    elif any(k in p for k in ['edm', 'dance', 'techno', 'house', 'rave', 'club', 'drop', 'dj', 'remix']):
-        style = 'edm'
-        bpm = 126.0
+    elif is_edm:
+        style = 'edm'; bpm = 126.0
         chords = [
             [174.61, 220.00, 261.63, 349.23], # F
             [130.81, 164.81, 196.00, 261.63], # C
             [146.83, 174.61, 220.00, 293.66], # Dm
             [116.54, 146.83, 174.61, 233.08]  # Bb
         ]
-    elif any(k in p for k in ['trap', 'hiphop', 'hip hop', 'rap', '808', 'drill', 'freestyle']):
-        style = 'trap'
-        bpm = 138.0
+    elif is_trap:
+        style = 'trap'; bpm = 138.0
         chords = [
             [130.81, 155.56, 196.00, 261.63], # Cm
             [98.00, 116.54, 146.83, 196.00],  # Gm
             [103.83, 130.81, 155.56, 207.65], # Ab
             [116.54, 146.83, 174.61, 233.08]  # Bb
         ]
-    elif any(k in p for k in ['rock', 'metal', 'punk', 'heavy', 'riff']):
-        style = 'rock'
-        bpm = 130.0
-        chords = [
-            [82.41, 123.47, 164.81],   # E5
-            [98.00, 146.83, 196.00],   # G5
-            [65.41, 98.00, 130.81],    # C5
-            [73.42, 110.00, 146.83]    # D5
-        ]
-    elif any(k in p for k in ['piano', 'classical', 'ballad', 'melancholy', 'sad']):
-        style = 'piano'
-        bpm = 76.0
+    elif is_piano:
+        style = 'piano'; bpm = 74.0
         chords = [
             [130.81, 164.81, 196.00, 246.94], # Cmaj7
             [110.00, 130.81, 164.81, 196.00], # Am7
             [87.31, 130.81, 174.61, 220.00],  # Fmaj7
             [98.00, 123.47, 146.83, 196.00]   # G7
         ]
-    elif any(k in p for k in ['space', 'cosmic', 'galaxy', 'ambient', 'stars', 'deep', 'nebula', 'meditation']):
-        style = 'space'
-        bpm = 62.0
-        chords = [
-            [146.83, 220.00, 261.63, 329.63, 440.00], # Dm9
-            [116.54, 174.61, 233.08, 293.66, 349.23], # Bbmaj7
-            [174.61, 261.63, 329.63, 392.00, 523.25], # Fmaj7
-            [130.81, 196.00, 246.94, 293.66, 392.00]  # Cadd9
-        ]
-    elif any(k in p for k in ['lofi', 'chill', 'lo-fi', 'relax', 'rain', 'mellow', 'warm', 'rhodes', 'study']):
-        style = 'lofi'
-        bpm = 78.0
-        chords = [
-            [130.81, 164.81, 196.00, 246.94, 293.66], # Cmaj9
-            [110.00, 164.81, 220.00, 261.63, 329.63], # Am9
-            [146.83, 174.61, 220.00, 261.63, 349.23], # Dm9
-            [98.00, 146.83, 196.00, 246.94, 293.66]   # G9
-        ]
-    elif any(k in p for k in ['epic', 'orchestral', 'tension', 'cinematic', 'brass', 'timpani', 'trailer']):
-        style = 'epic'
-        bpm = 92.0
-        chords = [
-            [65.41, 130.81, 196.00, 261.63, 311.13], # Cm
-            [51.91, 103.83, 155.56, 207.65, 261.63], # Ab
-            [43.65, 87.31, 130.81, 174.61, 207.65],  # Fm
-            [49.00, 98.00, 146.83, 196.00, 246.94]   # G
-        ]
-    elif any(k in p for k in ['cyberpunk', 'synthwave', '80s', 'retro', 'neon', 'synth']):
-        style = 'cyber'
-        bpm = 116.0
+    elif is_cyber:
+        style = 'cyber'; bpm = 118.0
         chords = [
             [146.83, 220.00, 261.63, 349.23], # Dm
             [116.54, 174.61, 233.08, 293.66], # Bb
             [174.61, 261.63, 349.23, 440.00], # F
             [130.81, 196.00, 261.63, 329.63]  # C
         ]
-    else:
-        # Dynamic procedural atmospheric synthesis (melodic, gentle, balanced)
-        h_val = abs(hash(prompt))
-        bpm = 76.0 + float(h_val % 28)
-        root_base = 130.81 * (2.0 ** ((h_val % 12) / 12.0))
-        style = 'ambient_melody'
+    elif is_lofi:
+        style = 'lofi'; bpm = 78.0
         chords = [
-            [root_base, root_base * 1.25, root_base * 1.5, root_base * 1.875],
-            [root_base * 0.89, root_base * 1.12, root_base * 1.33, root_base * 1.67],
-            [root_base * 0.75, root_base * 0.94, root_base * 1.12, root_base * 1.41],
-            [root_base * 0.84, root_base * 1.05, root_base * 1.26, root_base * 1.58]
+            [130.81, 164.81, 196.00, 246.94, 293.66], # Cmaj9
+            [110.00, 164.81, 220.00, 261.63, 329.63], # Am9
+            [146.83, 174.61, 220.00, 261.63, 349.23], # Dm9
+            [98.00, 146.83, 196.00, 246.94, 293.66]   # G9
+        ]
+    elif is_space:
+        style = 'space'; bpm = 60.0
+        chords = [
+            [146.83, 220.00, 261.63, 329.63, 440.00], # Dm9
+            [116.54, 174.61, 233.08, 293.66, 349.23], # Bbmaj7
+            [174.61, 261.63, 329.63, 392.00, 523.25], # Fmaj7
+            [130.81, 196.00, 246.94, 293.66, 392.00]  # Cadd9
+        ]
+    elif is_rock:
+        style = 'rock'; bpm = 128.0
+        chords = [
+            [82.41, 123.47, 164.81],   # E5
+            [98.00, 146.83, 196.00],   # G5
+            [65.41, 98.00, 130.81],    # C5
+            [73.42, 110.00, 146.83]    # D5
+        ]
+    else:
+        # Dynamic procedural atmospheric synthesis
+        h_val = abs(hash(prompt or "cinematic"))
+        bpm = 72.0 + float(h_val % 30)
+        root_base = 130.81 * (2.0 ** ((h_val % 7) / 12.0))
+        style = 'cinematic_custom'
+        chords = [
+            [root_base, root_base * 1.25, root_base * 1.5],
+            [root_base * 0.89, root_base * 1.12, root_base * 1.33],
+            [root_base * 0.75, root_base * 0.94, root_base * 1.12],
+            [root_base * 0.84, root_base * 1.05, root_base * 1.26]
         ]
 
     beat_dur = 60.0 / bpm
@@ -1194,106 +1210,67 @@ def generate_cinematic_soundtrack(prompt: str, duration_sec: float = 4.0, sample
     t_beat = t % beat_dur
     beat_num = np.floor(t / beat_dur).astype(int) % 4
 
-    np.random.seed(int(abs(hash(prompt))) % 100000)
+    np.random.seed(int(abs(hash(prompt or "sound"))) % 100000)
     white_noise = np.random.uniform(-1.0, 1.0, len(t))
 
-    # 1. KICK / PERCUSSION
+    # 1. KICK / PERCUSSION (Soft Attack, zero transient pop)
     tau_k = t_beat
-    k_phase = 2.0 * np.pi * (45.0 * tau_k - (115.0 / 35.0) * (np.exp(-35.0 * tau_k) - 1.0))
-    k_pulse = np.sin(k_phase) * (0.85 * np.exp(-16.0 * tau_k) + 0.35 * np.exp(-70.0 * tau_k))
+    k_env = (1.0 - np.exp(-tau_k / 0.006)) * np.exp(-14.0 * tau_k)
+    k_sweep = 2.0 * np.pi * (52.0 * tau_k + (95.0 / 25.0) * (1.0 - np.exp(-25.0 * tau_k)))
+    kick_pulse = np.sin(k_sweep) * k_env
 
     if style in ['gaming', 'edm']:
-        kick = k_pulse
+        kick = kick_pulse * 0.95
     elif style == 'trap':
-        k_mask = (beat_num == 0) | ((beat_num == 2) & (t_beat > beat_dur * 0.5))
-        kick = k_pulse * k_mask * 1.1
-    elif style == 'rock':
-        k_mask = (beat_num == 0) | (beat_num == 2)
-        kick = k_pulse * k_mask
-    elif style == 'lofi':
-        k_mask = (beat_num == 0) | ((beat_num == 2) & (t_beat > beat_dur * 0.35))
-        kick = k_pulse * k_mask * 0.7
-    elif style == 'romantic':
-        # Soft acoustic Bayan/Tabla low thump
-        bayan_phase = 2.0 * np.pi * (62.0 - 15.0 * np.exp(-28.0 * tau_k)) * tau_k
-        kick = np.sin(bayan_phase) * np.exp(-11.0 * tau_k) * ((beat_num == 0) | (beat_num == 2)) * 0.65
-    elif style == 'epic':
-        timp_phase = 2.0 * np.pi * (38.0 * tau_k - (90.0 / 15.0) * (np.exp(-15.0 * tau_k) - 1.0))
-        kick = np.sin(timp_phase) * np.exp(-9.0 * tau_k) * ((beat_num == 0) | (beat_num == 2)) * 1.2
-    elif style == 'piano':
+        kick = kick_pulse * ((beat_num == 0) | ((beat_num == 2) & (t_beat > beat_dur * 0.5))) * 1.1
+    elif style in ['romantic', 'piano']:
+        kick = np.sin(2.0 * np.pi * 55.0 * tau_k) * np.exp(-12.0 * tau_k) * ((beat_num == 0) | (beat_num == 2)) * 0.4
+    elif style in ['space', 'meditation']:
         kick = np.zeros_like(t)
     else:
-        kick = k_pulse * ((beat_num == 0) | (beat_num == 2)) * 0.5
+        kick = kick_pulse * ((beat_num == 0) | (beat_num == 2)) * 0.65
 
     # 2. SNARE / CLAP
     tau_s = t_beat
-    s_tone = np.sin(2.0 * np.pi * 185.0 * tau_s) * np.exp(-28.0 * tau_s)
-    s_noise = white_noise * np.exp(-22.0 * tau_s)
-    snare_hit = 0.45 * s_tone + 0.55 * s_noise
+    s_env = (1.0 - np.exp(-tau_s / 0.005)) * np.exp(-20.0 * tau_s)
+    snare_hit = (0.35 * np.sin(2.0 * np.pi * 175.0 * tau_s) + 0.65 * white_noise) * s_env
 
     if style in ['gaming', 'edm', 'rock', 'cyber']:
-        snare_mask = (beat_num == 1) | (beat_num == 3)
-        snare = snare_hit * snare_mask * 0.85
+        snare = snare_hit * ((beat_num == 1) | (beat_num == 3)) * 0.75
     elif style == 'trap':
-        snare = snare_hit * (beat_num == 2) * 1.0
-    elif style == 'lofi':
-        snare = (0.2 * s_tone + 0.3 * s_noise) * ((beat_num == 1) | (beat_num == 3)) * 0.5
+        snare = snare_hit * (beat_num == 2) * 0.9
     elif style == 'romantic':
-        # Soft acoustic rim tap / shaker on beat 2 and 4
-        snare = white_noise * np.exp(-45.0 * tau_s) * ((beat_num == 1) | (beat_num == 3)) * 0.22
-    elif style == 'epic':
-        snare = white_noise * np.exp(-14.0 * tau_s) * (beat_num == 2) * 0.45
-    else:
+        snare = white_noise * np.exp(-40.0 * tau_s) * ((beat_num == 1) | (beat_num == 3)) * 0.15
+    elif style in ['space', 'piano']:
         snare = np.zeros_like(t)
+    else:
+        snare = snare_hit * ((beat_num == 1) | (beat_num == 3)) * 0.4
 
     # 3. HI-HATS / SHAKERS
     hat = np.zeros_like(t)
     if style in ['gaming', 'trap']:
         t_16 = t % (beat_dur / 4.0)
-        hat = white_noise * np.exp(-65.0 * t_16) * 0.16
-    elif style == 'edm':
+        hat = white_noise * np.exp(-55.0 * t_16) * 0.12
+    elif style in ['edm', 'cyber']:
         t_off = (t - beat_dur * 0.5) % beat_dur
-        hat = white_noise * np.exp(-25.0 * t_off) * (t_off < beat_dur * 0.45) * 0.15
+        hat = white_noise * np.exp(-28.0 * t_off) * (t_off < beat_dur * 0.4) * 0.12
     elif style == 'romantic':
         t_8 = t % (beat_dur / 2.0)
-        hat = white_noise * np.exp(-50.0 * t_8) * 0.08
-    elif style in ['lofi', 'ambient_melody']:
-        t_8 = t % (beat_dur / 2.0)
-        hat = (white_noise * 0.015 + white_noise * np.exp(-55.0 * t_8) * 0.06)
+        hat = white_noise * np.exp(-48.0 * t_8) * 0.06
 
-    # 4. CHORD PADS & ENSEMBLE
+    # 4. CHORDS & PADS (Rich Lush Warm Stereo)
     pad_L = np.zeros_like(t)
     pad_R = np.zeros_like(t)
-    sc_env = 0.4 + 0.6 * (1.0 - np.exp(-12.0 * t_beat)) if style in ['gaming', 'edm'] else 1.0
-
     for c_i, c_notes in enumerate(chords):
         mask = (chord_idx == c_i)
         if not np.any(mask): continue
         t_sub = t[mask]
-        norm = 0.38 / len(c_notes)
+        norm = 0.40 / len(c_notes)
         for note_f in c_notes:
-            if style == 'romantic':
-                # Warm string pad
-                v_l = (0.6 * np.sin(2*np.pi*note_f*t_sub) + 0.3 * np.sin(2*np.pi*(note_f*1.002)*t_sub) + 0.1 * np.sin(4*np.pi*note_f*t_sub))
-                v_r = (0.6 * np.sin(2*np.pi*note_f*t_sub) + 0.3 * np.sin(2*np.pi*(note_f*0.998)*t_sub) + 0.1 * np.sin(4*np.pi*note_f*t_sub))
-            elif style in ['gaming', 'edm', 'cyber']:
-                v_l = (0.50 * np.sin(2*np.pi*note_f*t_sub) + 0.30 * np.sin(4*np.pi*(note_f*1.003)*t_sub) + 0.15 * np.sin(6*np.pi*note_f*t_sub))
-                v_r = (0.50 * np.sin(2*np.pi*note_f*t_sub) + 0.30 * np.sin(4*np.pi*(note_f*0.997)*t_sub) + 0.15 * np.sin(6*np.pi*note_f*t_sub))
-            elif style in ['piano', 'lofi']:
-                t_n = (t_sub % (bar_dur / 2.0))
-                env = np.exp(-2.2 * t_n)
-                v_l = (0.6 * np.sin(2*np.pi*note_f*t_sub) + 0.25 * np.sin(4*np.pi*note_f*t_sub)) * env
-                v_r = (0.6 * np.sin(2*np.pi*note_f*t_sub) + 0.25 * np.sin(4*np.pi*note_f*t_sub)) * env
-            else:
-                lfo = 0.8 + 0.2 * np.sin(2.0 * np.pi * 0.25 * t_sub)
-                v_l = (0.55 * np.sin(2*np.pi*note_f*t_sub) + 0.3 * np.sin(2*np.pi*(note_f*1.002)*t_sub)) * lfo
-                v_r = (0.55 * np.sin(2*np.pi*note_f*t_sub) + 0.3 * np.sin(2*np.pi*(note_f*0.998)*t_sub)) * lfo
-
+            v_l = (0.55 * np.sin(2*np.pi*note_f*t_sub) + 0.30 * np.sin(2*np.pi*(note_f*1.002)*t_sub) + 0.15 * np.sin(4*np.pi*note_f*t_sub))
+            v_r = (0.55 * np.sin(2*np.pi*note_f*t_sub) + 0.30 * np.sin(2*np.pi*(note_f*0.998)*t_sub) + 0.15 * np.sin(4*np.pi*note_f*t_sub))
             pad_L[mask] += v_l * norm
             pad_R[mask] += v_r * norm
-
-    if isinstance(sc_env, np.ndarray) or sc_env != 1.0:
-        pad_L *= sc_env; pad_R *= sc_env
 
     # 5. SUB-BASS
     bass = np.zeros_like(t)
@@ -1303,104 +1280,98 @@ def generate_cinematic_soundtrack(prompt: str, duration_sec: float = 4.0, sample
         root_f = c_notes[0] * 0.5
         t_sub = t[mask]
         t_b = (t_sub % beat_dur)
-        if style in ['gaming', 'trap', 'edm']:
-            b_env = np.exp(-4.5 * t_b)
-            phase = 2.0 * np.pi * root_f * t_sub
-            bass[mask] = np.sin(phase) * b_env * 0.85
-        else:
-            b_env = np.exp(-2.5 * t_b)
-            bass[mask] = np.sin(2*np.pi*root_f*t_sub) * b_env * 0.7
+        b_att = np.clip(t_b / 0.015, 0.0, 1.0)
+        b_env = b_att * np.exp(-3.0 * t_b)
+        bass[mask] = (np.sin(2 * np.pi * root_f * t_sub) + 0.15 * np.sin(4 * np.pi * root_f * t_sub)) * b_env * 0.75
 
-    # 6. MELODIC LINE / INSTRUMENT LEAD (Musical & Pleasant, NO Harsh Bips)
+    # 6. MELODIC LEAD (Natural Acoustic Instrument Timbres — NEVER Beeps)
     lead_L = np.zeros_like(t)
     lead_R = np.zeros_like(t)
 
     if style == 'romantic':
-        # A. Acoustic Guitar Pluck (8th notes, warm decay)
-        t_p = t % (beat_dur / 2.0)
-        p_step = np.floor(t / (beat_dur / 2.0)).astype(int) % 8
-        p_env = np.exp(-6.0 * t_p)
-        for c_i, c_notes in enumerate(chords):
-            mask = (chord_idx == c_i)
-            if not np.any(mask): continue
-            t_sub = t[mask]
-            s_sub = p_step[mask]
-            freqs = np.array([c_notes[s % len(c_notes)] for s in s_sub])
-            sig = (np.sin(2*np.pi*freqs*t_sub) + 0.35*np.sin(4*np.pi*freqs*t_sub)) * p_env[mask]
-            is_even = (s_sub % 2 == 0)
-            lead_L[mask] += sig * np.where(is_even, 0.75, 0.25) * 0.35
-            lead_R[mask] += sig * np.where(is_even, 0.25, 0.75) * 0.35
-
-        # B. Expressive Bansuri / Flute Melody
         flute_notes = [493.88, 587.33, 659.25, 783.99, 659.25, 587.33, 493.88, 440.00]
         note_dur = beat_dur
         flute_idx = np.floor(t / note_dur).astype(int) % len(flute_notes)
         t_note = t % note_dur
-        flute_env = (np.sin(np.pi * (t_note / note_dur)) ** 0.6) * (t_note < note_dur * 0.95)
+        flute_env = (np.sin(np.pi * np.clip(t_note / note_dur, 0, 1)) ** 0.7) * (t_note < note_dur * 0.94)
         f_freqs = np.array([flute_notes[i] for i in flute_idx])
         vib = 1.0 + 0.012 * np.sin(2 * np.pi * 5.2 * t)
         f_phase = 2 * np.pi * f_freqs * vib * t
-        flute_sig = (np.sin(f_phase) + 0.22 * np.sin(2 * f_phase)) * flute_env * 0.40
-        lead_L += flute_sig * 0.5
-        lead_R += flute_sig * 0.5
+        flute_sig = (np.sin(f_phase) + 0.22 * np.sin(2 * f_phase) + 0.08 * white_noise) * flute_env * 0.45
+        lead_L += flute_sig * 0.55
+        lead_R += flute_sig * 0.55
 
-    else:
-        # Musical 8th-note melodic phrases (gentle, warm synth or piano lead)
-        div = 2.0 # 8th notes, never rapid 16th bips!
-        t_arp = t % (beat_dur / div)
-        arp_step = np.floor(t / (beat_dur / div)).astype(int) % 8
-        a_env = np.exp(-6.5 * t_arp)
+    elif style in ['piano', 'lofi']:
         for c_i, c_notes in enumerate(chords):
             mask = (chord_idx == c_i)
             if not np.any(mask): continue
             t_sub = t[mask]
-            step_sub = arp_step[mask]
-            arp_freqs = np.array([c_notes[s % len(c_notes)] for s in step_sub])
-            tone = (np.sin(2*np.pi*arp_freqs*t_sub) + 0.25 * np.sin(4*np.pi*arp_freqs*t_sub)) * a_env[mask]
-            is_even = (step_sub % 2 == 0)
-            lead_L[mask] += tone * (np.where(is_even, 0.75, 0.25) * 0.30)
-            lead_R[mask] += tone * (np.where(is_even, 0.25, 0.75) * 0.30)
+            p_note_dur = beat_dur
+            p_step = np.floor(t_sub / p_note_dur).astype(int) % len(c_notes)
+            freqs = np.array([c_notes[s] for s in p_step])
+            t_p = t_sub % p_note_dur
+            p_att = np.clip(t_p / 0.012, 0.0, 1.0)
+            p_env = p_att * np.exp(-2.2 * t_p)
+            piano_sig = (
+                0.65 * np.sin(2 * np.pi * freqs * t_sub) +
+                0.25 * np.sin(4 * np.pi * freqs * t_sub) +
+                0.10 * np.sin(6 * np.pi * freqs * t_sub)
+            ) * p_env * 0.40
+            lead_L[mask] += piano_sig * 0.5
+            lead_R[mask] += piano_sig * 0.5
+
+    elif style in ['cyber', 'gaming']:
+        for c_i, c_notes in enumerate(chords):
+            mask = (chord_idx == c_i)
+            if not np.any(mask): continue
+            t_sub = t[mask]
+            lead_f = c_notes[-1]
+            t_l = t_sub % (beat_dur * 2.0)
+            l_att = np.clip(t_l / 0.04, 0.0, 1.0)
+            l_env = l_att * np.exp(-1.4 * t_l)
+            synth_sig = (
+                0.50 * np.sin(2 * np.pi * lead_f * t_sub) +
+                0.30 * np.sin(2 * np.pi * (lead_f * 1.003) * t_sub) +
+                0.20 * np.sin(4 * np.pi * lead_f * t_sub)
+            ) * l_env * 0.35
+            lead_L[mask] += synth_sig * 0.5
+            lead_R[mask] += synth_sig * 0.5
+
+    else:
+        for c_i, c_notes in enumerate(chords):
+            mask = (chord_idx == c_i)
+            if not np.any(mask): continue
+            t_sub = t[mask]
+            bell_f = c_notes[1] if len(c_notes) > 1 else c_notes[0]
+            t_bell = t_sub % (beat_dur * 2.0)
+            b_att = np.clip(t_bell / 0.035, 0.0, 1.0)
+            b_env = b_att * np.exp(-1.8 * t_bell)
+            bell_sig = (
+                0.60 * np.sin(2 * np.pi * bell_f * t_sub) +
+                0.25 * np.sin(2 * np.pi * (bell_f * 2.0) * t_sub) +
+                0.15 * np.sin(2 * np.pi * (bell_f * 3.0) * t_sub)
+            ) * b_env * 0.32
+            lead_L[mask] += bell_sig * 0.5
+            lead_R[mask] += bell_sig * 0.5
 
     # 7. MASTER STEREO SUMMING
-    if style == 'romantic':
-        L = 0.45 * pad_L + 0.28 * bass + 0.35 * kick + 0.15 * snare + 0.10 * hat + 0.50 * lead_L
-        R = 0.45 * pad_R + 0.28 * bass + 0.35 * kick + 0.15 * snare + 0.10 * hat + 0.50 * lead_R
-    elif style in ['gaming', 'action']:
-        L = 0.40 * pad_L + 0.40 * bass + 0.42 * kick + 0.28 * snare + 0.15 * hat + 0.32 * lead_L
-        R = 0.40 * pad_R + 0.40 * bass + 0.42 * kick + 0.28 * snare + 0.15 * hat + 0.32 * lead_R
-    elif style == 'edm':
-        L = 0.42 * pad_L + 0.38 * bass + 0.45 * kick + 0.28 * snare + 0.16 * hat + 0.30 * lead_L
-        R = 0.42 * pad_R + 0.38 * bass + 0.45 * kick + 0.28 * snare + 0.16 * hat + 0.30 * lead_R
-    elif style == 'trap':
-        L = 0.30 * pad_L + 0.48 * bass + 0.35 * kick + 0.35 * snare + 0.18 * hat + 0.25 * lead_L
-        R = 0.30 * pad_R + 0.48 * bass + 0.35 * kick + 0.35 * snare + 0.18 * hat + 0.25 * lead_R
-    elif style == 'piano':
-        L = 0.55 * pad_L + 0.25 * bass + 0.40 * lead_L
-        R = 0.55 * pad_R + 0.25 * bass + 0.40 * lead_R
-    elif style == 'space':
-        L = 0.55 * pad_L + 0.32 * bass + 0.18 * kick + 0.10 * hat + 0.25 * lead_L
-        R = 0.55 * pad_R + 0.32 * bass + 0.18 * kick + 0.10 * hat + 0.25 * lead_R
-    elif style == 'lofi':
-        L = 0.48 * pad_L + 0.32 * bass + 0.25 * kick + 0.20 * snare + 0.12 * hat + 0.25 * lead_L
-        R = 0.48 * pad_R + 0.32 * bass + 0.25 * kick + 0.20 * snare + 0.12 * hat + 0.25 * lead_R
-    else:
-        L = 0.45 * pad_L + 0.32 * bass + 0.28 * kick + 0.20 * snare + 0.12 * hat + 0.35 * lead_L
-        R = 0.45 * pad_R + 0.32 * bass + 0.28 * kick + 0.20 * snare + 0.12 * hat + 0.35 * lead_R
+    L = 0.42 * pad_L + 0.32 * bass + 0.30 * kick + 0.18 * snare + 0.10 * hat + 0.45 * lead_L
+    R = 0.42 * pad_R + 0.32 * bass + 0.30 * kick + 0.18 * snare + 0.10 * hat + 0.45 * lead_R
 
-    # 8. BLACKMAN LOW-PASS FILTER (Eliminates all digital harshness, clicks & bips)
-    k = np.blackman(11); k /= k.sum()
+    # 8. BLACKMAN FILTER (Strips out harsh digital frequencies and clicks)
+    k = np.blackman(15); k /= k.sum()
     L = np.convolve(L, k, mode='same')
     R = np.convolve(R, k, mode='same')
 
-    # 9. SMOOTH MASTER FADE-IN & FADE-OUT
-    fade_len = min(int(sample_rate * 0.2), len(t) // 4)
+    # 9. MASTER SMOOTH FADE-IN & FADE-OUT
+    fade_len = min(int(sample_rate * 0.15), len(t) // 4)
     if fade_len > 0:
         fade_in = np.linspace(0, 1, fade_len)
         fade_out = np.linspace(1, 0, fade_len)
         L[:fade_len] *= fade_in; L[-fade_len:] *= fade_out
         R[:fade_len] *= fade_in; R[-fade_len:] *= fade_out
 
-    # 10. HEADROOM NORMALIZATION (Warm & Clean, Zero Digital Clipping)
+    # 10. HEADROOM NORMALIZATION
     peak = max(float(np.max(np.abs(L))), float(np.max(np.abs(R))), 0.001)
     L = (L / peak) * 0.88
     R = (R / peak) * 0.88
@@ -1654,7 +1625,8 @@ def get_git_info() -> dict:
 
 @st.cache_data(ttl=300)
 def get_user_github_repos(account: str = "ankush-dev-eng") -> list[dict]:
-    """Queries user's GitHub repositories via gh CLI, falling back to verified repository roster."""
+    """Queries user's GitHub repositories via public API and gh CLI, falling back to verified repository roster."""
+    account = (account or "ankush-dev-eng").strip()
     default_repos = [
         {"name": "ai-hub", "description": "Multi-Model AI Prototyping Studio (Gemini + Groq + FLUX)", "default_file": "app.py"},
         {"name": "NiveshRakshak", "description": "AI-Powered Financial Safety & Message Fraud Analyzer", "default_file": "backend/main.py"},
@@ -1666,13 +1638,33 @@ def get_user_github_repos(account: str = "ankush-dev-eng") -> list[dict]:
         {"name": "ecopulse", "description": "AI-Powered Sustainable Supply Chain & Carbon Calculator", "default_file": "app.py"},
         {"name": "pulsecheck-ai", "description": "AI-Powered Emergency Response & SOS Hub", "default_file": "app.py"}
     ]
+    # 1. Live Public GitHub API
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/users/{urllib.parse.quote(account)}/repos?per_page=100&sort=updated",
+            headers={"User-Agent": "Mozilla/5.0", "Accept": "application/vnd.github.v3+json"}
+        )
+        with urllib.request.urlopen(req, timeout=6) as response:
+            api_data = json.loads(response.read().decode("utf-8"))
+            if isinstance(api_data, list) and api_data:
+                api_repos = []
+                for item in api_data:
+                    name = item.get("name", "")
+                    desc = item.get("description", "") or ""
+                    def_file = "backend/main.py" if name == "NiveshRakshak" else "app.py"
+                    api_repos.append({"name": name, "description": desc, "default_file": def_file})
+                if api_repos:
+                    return api_repos
+    except Exception:
+        pass
+
+    # 2. Local gh CLI fallback
     try:
         res = subprocess.run(
             ["gh", "repo", "list", account, "--limit", "30", "--json", "name,description,visibility"],
             capture_output=True, text=True, timeout=8
         )
         if res.returncode == 0 and res.stdout.strip():
-            import json
             data = json.loads(res.stdout)
             repos = []
             for item in data:
@@ -1685,6 +1677,39 @@ def get_user_github_repos(account: str = "ankush-dev-eng") -> list[dict]:
     except Exception:
         pass
     return default_repos
+
+@st.cache_data(ttl=300)
+def get_repo_python_files(account: str, repo: str, branch: str = "main") -> list[str]:
+    """Dynamically inspects a GitHub repository tree to discover all Python files (.py) for zero-guesswork deployment."""
+    common_candidates = ["app.py", "backend/main.py", "main.py", "streamlit_app.py", "dashboard.py"]
+    account = (account or "ankush-dev-eng").strip()
+    repo = (repo or "").strip()
+    branch = (branch or "main").strip()
+    if not repo or repo.startswith("➕"):
+        return common_candidates
+    try:
+        url = f"https://api.github.com/repos/{urllib.parse.quote(account)}/{urllib.parse.quote(repo)}/git/trees/{urllib.parse.quote(branch)}?recursive=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/vnd.github.v3+json"})
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+            files = [
+                item["path"] for item in data.get("tree", [])
+                if item.get("path", "").endswith(".py")
+                and not any(item.get("path", "").startswith(p) for p in [".venv", "venv", "env", "test", "tests", ".pytest"])
+            ]
+            if files:
+                # Prioritize primary entrypoints at the top
+                ranked = []
+                for c in ["backend/main.py", "app.py", "main.py", "streamlit_app.py", "dashboard.py"]:
+                    if c in files:
+                        ranked.append(c)
+                for f in files:
+                    if f not in ranked:
+                        ranked.append(f)
+                return ranked
+    except Exception:
+        pass
+    return ["backend/main.py" if repo == "NiveshRakshak" else "app.py"] + [c for c in common_candidates if c != ("backend/main.py" if repo == "NiveshRakshak" else "app.py")]
 
 def execute_github_publish(repo_name: str, account: str, is_public: bool, commit_msg: str, status_placeholder=None) -> tuple[bool, str, str]:
     """Publishes current workspace to GitHub under user's account and returns (success, repo_url_or_err, deploy_url)."""
@@ -2033,9 +2058,9 @@ if "tab3_audio_bytes" not in st.session_state:
 if "tab3_audio_caption" not in st.session_state:
     st.session_state.tab3_audio_caption = None
 if "tab3_aud_preset" not in st.session_state:
-    st.session_state.tab3_aud_preset = list(AUDIO_PRESETS.keys())[0]
+    st.session_state.tab3_aud_preset = "✏️ Custom Atmospheric Sound Prompt"
 if "tab3_aud_prompt" not in st.session_state:
-    st.session_state.tab3_aud_prompt = AUDIO_PRESETS[list(AUDIO_PRESETS.keys())[0]]
+    st.session_state.tab3_aud_prompt = ""
 
 # Extra state for the redesigned UI
 if "last_latency" not in st.session_state:
@@ -2204,6 +2229,127 @@ def generate(model: dict, messages: list, attachments: list):
         'e.g. id["Presentation Service (FastAPI)"].'
     )
 
+    # ---------------------------------------------------------
+    # Autonomous Multi-Tab Agent (Images, Anime Logos, Audio, Video)
+    # ---------------------------------------------------------
+    last_user_msg = ""
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            last_user_msg = m.get("content", "")
+            break
+
+    raw_query = last_user_msg.split("\n\n--- 📄 ATTACHED")[0].split("\n\n--- 📑 ATTACHED")[0].strip()
+    q_lower = raw_query.lower()
+
+    # Distinguish generation commands from questions/analysis
+    is_analysis = any(w in q_lower for w in [
+        "analyse", "analyze", "explain", "review", "summary", "summarize",
+        "inspect", "what is", "why", "how to", "audit this", "check this",
+        "can you analyse", "can you analyze", "can you explain"
+    ])
+
+    if not is_analysis:
+        # A. Anime / Vector Logo Generation Intent
+        is_anime_logo = (
+            any(k in q_lower for k in ["anime logo", "vector logo", "project logo", "app logo", "mascot logo", "brand logo"]) or
+            (("logo" in q_lower or "emblem" in q_lower) and any(a in q_lower for a in ["generate", "create", "make", "draw", "design"]))
+        )
+        if is_anime_logo:
+            core = re.sub(r"^(can you\s+)?(please\s+)?(generate|create|make|draw|design)\s+(an?\s+)?(anime\s+|vector\s+|project\s+|app\s+)?logo\s*(of|for|with)?\s*", "", raw_query, flags=re.I).strip()
+            core = core or "hackathon innovation ai tech"
+            prompt_styled = f"{core}, modern vector logo emblem, anime mascot graphic art style, minimalist icon, vibrant gradient colors, clean sharp lines, professional centered design, 8k render, dark background"
+            try:
+                img_bytes = generate_cloud_image_flux_or_horde(prompt_styled, width=1024, height=1024, hf_token=hf_token, engine_choice="✦ Pollinations Cloud FLUX (Zero Token)")
+                st.session_state["_last_generated_media"] = [{"kind": "image", "data": img_bytes, "prompt": prompt_styled}]
+                yield f"✨ **Vector Anime Logo Generated!**\n\n🎨 **Concept:** *{core}*\n⚡ **Engine:** Cloud FLUX.1 Vector Synthesizer (1024×1024)\n\nHere is your custom hackathon logo with Fullscreen, Minimize, and Download controls:"
+                return
+            except Exception as e:
+                yield f"⚠️ Anime logo generation notice: `{e}`. Falling back to conversational response...\n\n"
+
+        # B. General Image Generation Intent
+        is_img_gen = (
+            any(q_lower.startswith(p) for p in [
+                "generate image", "generate an image", "create image", "create an image",
+                "draw image", "draw an image", "make an image", "paint an image", "generate a photo",
+                "create a photo", "generate visual", "create visual", "picture of", "photo of"
+            ]) or
+            (any(v in q_lower for v in ["generate", "create", "draw", "paint", "render", "make"]) and any(n in q_lower for n in ["image of", "picture of", "photo of", "illustration of", "visual of"]))
+        )
+        if is_img_gen:
+            core = re.sub(r"^(can you\s+)?(please\s+)?(generate|create|draw|paint|render|make)\s+(an?\s+)?(image|picture|photo|illustration|visual)\s*(of|showing|with)?\s*", "", raw_query, flags=re.I).strip()
+            core = core or "futuristic hyper-realistic scene"
+            try:
+                if st.session_state.get("colab_connected") and st.session_state.get("colab_tunnel_url"):
+                    try:
+                        img_bytes = generate_colab_image(st.session_state.colab_tunnel_url, core, width=1024, height=1024)
+                        engine_tag = "Google Colab 16GB Dedicated T4 GPU"
+                    except Exception:
+                        img_bytes = generate_cloud_image_flux_or_horde(core, width=1024, height=1024, hf_token=hf_token, engine_choice="✦ Pollinations Cloud FLUX (Zero Token)")
+                        engine_tag = "Cloud FLUX.1 Engine (Zero Token)"
+                else:
+                    img_bytes = generate_cloud_image_flux_or_horde(core, width=1024, height=1024, hf_token=hf_token, engine_choice="✦ Pollinations Cloud FLUX (Zero Token)")
+                    engine_tag = "Cloud FLUX.1 Engine (Zero Token)"
+
+                st.session_state["_last_generated_media"] = [{"kind": "image", "data": img_bytes, "prompt": core}]
+                yield f"🎨 **High-Resolution Visual Generated!**\n\n🌟 **Prompt:** *\"{core}\"*\n⚡ **Engine:** {engine_tag} (1024×1024 Native)\n\nHere is your render with Fullscreen, Minimize, and Download controls:"
+                return
+            except Exception as e:
+                yield f"⚠️ Image generation notice: `{e}`. Falling back to conversational response...\n\n"
+
+        # C. Music / Soundtrack / Audio Intent
+        is_audio_gen = (
+            any(k in q_lower for k in ["generate soundtrack", "generate audio", "generate music", "create music", "create audio", "create soundtrack", "make a soundtrack", "compose music", "compose soundtrack", "background music", "soundtrack for", "theme music"]) or
+            (("soundtrack" in q_lower or "audio track" in q_lower or "bgm" in q_lower) and any(v in q_lower for v in ["generate", "create", "make", "synthesize", "produce"]))
+        )
+        if is_audio_gen:
+            core = re.sub(r"^(can you\s+)?(please\s+)?(generate|create|make|compose|synthesize|produce)\s+(an?\s+)?(soundtrack|music|audio|bgm|beat|track)\s*(of|for|with)?\s*", "", raw_query, flags=re.I).strip()
+            core = core or "epic cinematic hackathon victory theme"
+            try:
+                aud_bytes = generate_cinematic_soundtrack(core, duration_sec=6.0)
+                st.session_state["_last_generated_media"] = [{"kind": "audio", "data": aud_bytes, "prompt": core}]
+                yield f"🎵 **Cinematic Soundtrack Synthesized!**\n\n🎧 **Theme & Mood:** *\"{core}\"*\n⚡ **Audio Engine:** 44.1kHz 16-bit Stereo PCM Synthesizer (0% Local GPU Load)\n\nHere is your audio track preview with playback and download:"
+                return
+            except Exception as e:
+                yield f"⚠️ Audio synthesis notice: `{e}`. Falling back to conversational response...\n\n"
+
+        # D. Video Generation Intent
+        is_video_gen = (
+            any(k in q_lower for k in ["generate video", "create video", "make a video", "render video", "motion video of"]) or
+            (("video" in q_lower or "clip" in q_lower) and any(v in q_lower for v in ["generate", "create", "render", "produce"]))
+        )
+        if is_video_gen:
+            core = re.sub(r"^(can you\s+)?(please\s+)?(generate|create|make|render|produce)\s+(an?\s+)?(video|clip|animation)\s*(of|showing|with)?\s*", "", raw_query, flags=re.I).strip()
+            core = core or "cinematic drone flight over futuristic neon metropolis"
+            try:
+                if st.session_state.get("colab_connected") and st.session_state.get("colab_tunnel_url"):
+                    try:
+                        vid_bytes = generate_colab_video(st.session_state.colab_tunnel_url, core, width=512, height=512, duration=2)
+                        engine_tag = "Google Colab MS-1.7B Video Diffusion"
+                    except Exception:
+                        vid_bytes = synthesize_multiscene_video(core, width=704, height=512, total_duration=5, hf_token=hf_token)
+                        engine_tag = "Storyboard Motion Synthesizer"
+                else:
+                    vid_bytes = synthesize_multiscene_video(core, width=704, height=512, total_duration=5, hf_token=hf_token)
+                    engine_tag = "Storyboard Motion Synthesizer"
+
+                st.session_state["_last_generated_media"] = [{"kind": "video", "data": vid_bytes, "prompt": core}]
+                yield f"🎬 **Cinematic Video Rendered!**\n\n🎥 **Scene:** *\"{core}\"*\n⚡ **Engine:** {engine_tag}\n\nHere is your rendered video clip:"
+                return
+            except Exception as e:
+                yield f"⚠️ Video synthesis notice: `{e}`. Falling back to conversational response...\n\n"
+
+    # Auto-route visual queries: if user attached an image and selected a text-only model
+    has_image_attachment = any(
+        (att.get("mime", "").startswith("image/") or att.get("name", "").lower().endswith(('.png', '.jpg', '.jpeg', '.webp')))
+        for att in (attachments or [])
+    )
+    if has_image_attachment and provider != "Gemini":
+        gk = gemini_key or os.getenv("GEMINI_API_KEY", "")
+        if gk:
+            st.toast("🖼️ Image detected — Auto-routing to Google Gemini Flash Vision")
+            yield from generate({"provider": "Gemini", "id": "gemini:gemini-3.8-flash", "name": "Google Gemini 3.8 Flash"}, messages, attachments)
+            return
+
     # 1. Groq Cloud LPU
     if provider == "Groq":
         k = groq_key or os.getenv("GROQ_API_KEY", "")
@@ -2226,8 +2372,8 @@ def generate(model: dict, messages: list, attachments: list):
         except Exception as groq_err:
             gk = gemini_key or os.getenv("GEMINI_API_KEY", "")
             if gk:
-                st.toast("⚡ Groq LPU busy — Failover routing via Gemini 3.5 Flash")
-                yield from generate({"provider": "Gemini", "id": "gemini:gemini-3.5-flash", "name": "Gemini 3.5 Flash"}, messages, attachments)
+                st.toast("⚡ Groq LPU busy — Failover routing via Gemini 3.8 Flash")
+                yield from generate({"provider": "Gemini", "id": "gemini:gemini-3.8-flash", "name": "Gemini 3.8 Flash"}, messages, attachments)
             else:
                 raise groq_err
 
@@ -2240,14 +2386,33 @@ def generate(model: dict, messages: list, attachments: list):
         from google.genai import types
         gm_client = genai.Client(api_key=k)
 
+        # Normalize deprecated model names to current 2026 production endpoints
+        if actual_model in ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash"]:
+            actual_model = "gemini-3.8-flash"
+
         contents = []
         for att in attachments:
-            if att.get("mime", "").startswith("image/"):
+            if att.get("mime", "").startswith("image/") or att.get("name", "").lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
                 try:
-                    img = Image.open(io.BytesIO(att["data"]))
-                    contents.append(img)
+                    mime = att.get("mime") or ("image/jpeg" if att.get("name", "").lower().endswith(('.jpg', '.jpeg')) else "image/png")
+                    contents.append(types.Part.from_bytes(data=att["data"], mime_type=mime))
                 except Exception:
-                    pass
+                    try:
+                        contents.append(Image.open(io.BytesIO(att["data"])))
+                    except Exception:
+                        pass
+
+        # Pull past images from conversation history so Gemini retains visual context across turns
+        ss = st.session_state
+        if "sessions" in ss and ss.get("active") in ss.sessions:
+            sess_msgs = ss.sessions[ss.active].get("messages", [])
+            for past_m in sess_msgs[:-1]:
+                for past_img in past_m.get("images", []):
+                    try:
+                        contents.append(types.Part.from_bytes(data=past_img, mime_type="image/png"))
+                    except Exception:
+                        pass
+
         if len(messages) > 1:
             hist_str = "Conversation history:\n"
             for m in messages[:-1]:
@@ -2557,6 +2722,9 @@ elif view == uikit.NAV[2]:
                "Native 1024x1024 visuals and 5–30s multi-scene MP4 video. 100% free with 0% laptop GPU load.")
 
     # ---- TOP-LEVEL HARDWARE ACCELERATION ENGINE SELECTOR ----
+    if "pending_hw_engine" in st.session_state:
+        st.session_state["tab3_hw_engine_selector"] = st.session_state.pop("pending_hw_engine")
+
     c_hw_radio, c_hw_badge = st.columns([1.25, 0.75], gap="medium")
     with c_hw_radio:
         hw_mode = st.radio(
@@ -2687,7 +2855,7 @@ elif view == uikit.NAV[2]:
                 st.session_state.colab_hardware_info = ""
                 st.session_state.colab_latency = ""
                 st.session_state.colab_last_error = None
-                st.session_state.tab3_hw_engine_selector = "☁️ Free Cloud Tier (Hugging Face ZeroGPU & Storyboard Synthesizer)"
+                st.session_state["pending_hw_engine"] = "☁️ Free Cloud Tier (Hugging Face ZeroGPU & Storyboard Synthesizer)"
                 if os.path.exists(COLAB_CACHE_FILE):
                     try: os.remove(COLAB_CACHE_FILE)
                     except Exception: pass
@@ -2708,7 +2876,7 @@ elif view == uikit.NAV[2]:
                             st.session_state.colab_hardware_info = msg
                             st.session_state.colab_latency = lat
                             st.session_state.colab_last_error = None
-                            st.session_state.tab3_hw_engine_selector = "⚡ Google Colab GPU Bridge (16GB Dedicated T4 GPU • True Video Diffusion)"
+                            st.session_state["pending_hw_engine"] = "⚡ Google Colab GPU Bridge (16GB Dedicated T4 GPU • True Video Diffusion)"
                             try:
                                 with open(COLAB_CACHE_FILE, "w", encoding="utf-8") as f:
                                     f.write(target_url)
@@ -3106,6 +3274,9 @@ elif view == uikit.NAV[2]:
     st.write("")
     with st.container(key="panel_audio_studio"):
         panel_title("🎵", "Cloud & Colab Audio Studio", "Generate high-fidelity atmospheric music, cybernetic soundscapes, and action audio effects.")
+        if "tab3_aud_prompt" not in st.session_state:
+            st.session_state["tab3_aud_prompt"] = ""
+
         c_aud_p, c_aud_ctrl = st.columns([2.6, 1.4], gap="medium")
         with c_aud_p:
             aud_preset = st.selectbox(
@@ -3116,7 +3287,8 @@ elif view == uikit.NAV[2]:
             )
             aud_prompt_val = st.text_input(
                 "Audio Prompt / Description:",
-                key="tab3_aud_prompt"
+                key="tab3_aud_prompt",
+                placeholder="Enter music style, genre, or mood (e.g., ambient synthwave, orchestral epic, acoustic lo-fi)..."
             )
         with c_aud_ctrl:
             aud_dur = st.selectbox(
@@ -3131,6 +3303,7 @@ elif view == uikit.NAV[2]:
 
         aud_status_box = st.empty()
         if gen_aud_btn:
+            resolved_aud_prompt = aud_prompt_val.strip() if aud_prompt_val and aud_prompt_val.strip() else AUDIO_PRESETS.get(aud_preset, "cinematic music soundtrack")
             with st.spinner(f"Synthesizing {aud_dur_val}s audio track..."):
                 t_aud0 = time.time()
                 aud_data = None
@@ -3142,7 +3315,7 @@ elif view == uikit.NAV[2]:
                         aud_status_box.info("⚡ Routing to Google Colab 16GB Tesla T4 GPU Bridge...")
                         aud_data = generate_colab_audio(
                             st.session_state.colab_tunnel_url,
-                            aud_prompt_val,
+                            resolved_aud_prompt,
                             duration=aud_dur_val,
                             status_placeholder=aud_status_box
                         )
@@ -3153,7 +3326,7 @@ elif view == uikit.NAV[2]:
 
                 # 2. Enhanced High-Fidelity Multi-Genre Audio Synthesizer
                 if not aud_data:
-                    aud_data = generate_cinematic_soundtrack(aud_prompt_val, duration_sec=float(aud_dur_val))
+                    aud_data = generate_cinematic_soundtrack(resolved_aud_prompt, duration_sec=float(aud_dur_val))
 
                 elapsed_aud = time.time() - t_aud0
                 st.session_state.tab3_audio_bytes = aud_data
@@ -3161,7 +3334,7 @@ elif view == uikit.NAV[2]:
                 aud_status_box.success(f"🎵 Generated {aud_dur_val}s cinematic audio track via {engine_tag} in {elapsed_aud:.2f}s!")
 
         if st.session_state.tab3_audio_bytes:
-            st.audio(st.session_state.tab3_audio_bytes, format="audio/wav")
+            uikit.media_card("audio", st.session_state.tab3_audio_bytes, key="tab3_aud_main")
             st.caption(st.session_state.tab3_audio_caption)
             render_media_export_card(
                 st.session_state.tab3_audio_bytes,
@@ -3191,8 +3364,16 @@ elif view == uikit.NAV[3]:
         c_gh_left, c_gh_right = st.columns([1.15, 0.85], gap="large")
 
         with c_gh_left:
-            st.markdown("##### 1. Universal Repository & Entrypoint Selector")
-            st.caption("Deploy **any** repository in your GitHub account (`ankush-dev-eng/{repo}`) directly to Streamlit Community Cloud.")
+            c_head_left, c_head_btn = st.columns([2.5, 1.2], vertical_alignment="center")
+            with c_head_left:
+                st.markdown("##### 1. Universal Repository & Entrypoint Selector")
+            with c_head_btn:
+                if st.button("🔄 Refresh Repos", key="tab4_refresh_repos_btn", use_container_width=True):
+                    get_user_github_repos.clear()
+                    get_repo_python_files.clear()
+                    st.rerun()
+
+            st.caption("Deploy **any** repository in your GitHub account directly to Streamlit Community Cloud with zero configuration errors.")
 
             # Load actual user repos
             user_repos = get_user_github_repos(detected_user)
@@ -3215,16 +3396,24 @@ elif view == uikit.NAV[3]:
             else:
                 final_repo_name = selected_repo_choice
 
+            c_user, c_vis = st.columns([1.1, 0.9])
+            with c_user:
+                gh_user = st.text_input("GitHub Username:", value=detected_user, key="tab4_gh_user")
+            with c_vis:
+                vis_option = st.selectbox("Hosting Tier:", ["Public (100% Free Hosting)", "Private"], index=0, key="tab4_repo_vis")
+
             c_br, c_entry = st.columns([0.8, 1.2])
             with c_br:
                 branch_choice = st.text_input("Branch:", value="main", key="tab4_branch_name")
             
             with c_entry:
-                # Intelligently suggest entrypoint
-                default_entry = "backend/main.py" if final_repo_name == "NiveshRakshak" else "app.py"
-                entrypoint_options = ["app.py", "backend/main.py", "main.py", "streamlit_app.py", "dashboard.py", "➕ [ Custom File Path ]"]
-                if default_entry not in entrypoint_options:
-                    entrypoint_options.insert(0, default_entry)
+                # Dynamically discover all actual Python files inside the selected repository
+                discovered_py = get_repo_python_files(gh_user.strip(), final_repo_name.strip(), branch_choice.strip())
+                entrypoint_options = list(discovered_py)
+                if "➕ [ Custom File Path ]" not in entrypoint_options:
+                    entrypoint_options.append("➕ [ Custom File Path ]")
+
+                default_entry = "backend/main.py" if (final_repo_name == "NiveshRakshak" or "backend/main.py" in entrypoint_options) else entrypoint_options[0]
                 entry_sel = st.selectbox(
                     "Main Python File (.py):",
                     options=entrypoint_options,
@@ -3232,15 +3421,9 @@ elif view == uikit.NAV[3]:
                     key="tab4_entry_sel"
                 )
                 if entry_sel == "➕ [ Custom File Path ]":
-                    entrypoint_file = st.text_input("Custom Entrypoint Path:", value="backend/main.py", key="tab4_custom_entry")
+                    entrypoint_file = st.text_input("Custom Entrypoint Path:", value="backend/main.py" if final_repo_name == "NiveshRakshak" else "app.py", key="tab4_custom_entry")
                 else:
                     entrypoint_file = entry_sel
-
-            c_user, c_vis = st.columns([1.1, 0.9])
-            with c_user:
-                gh_user = st.text_input("GitHub Username:", value=detected_user, key="tab4_gh_user")
-            with c_vis:
-                vis_option = st.selectbox("Hosting Tier:", ["Public (100% Free Hosting)", "Private"], index=0, key="tab4_repo_vis")
 
             repo_full_name = f"{gh_user.strip()}/{final_repo_name.strip()}"
             deploy_1click_url = f"https://share.streamlit.io/deploy?repository={urllib.parse.quote(repo_full_name)}&branch={urllib.parse.quote(branch_choice.strip())}&mainModule={urllib.parse.quote(entrypoint_file.strip())}"

@@ -39,12 +39,12 @@ MODELS: List[Dict[str, Any]] = [
          ctx="128K", cutoff="Dec 2025", speed="~280 tok/s"),
 
     # --- Google Gemini Cloud ---
-    dict(id="gemini:gemini-3.5-flash", provider="Gemini", name="Google Gemini 3.5 Flash",
-         ctx="1M", cutoff="Feb 2026", speed="~120 tok/s"),
-    dict(id="gemini:gemini-3.5-flash-lite", provider="Gemini", name="Google Gemini 3.5 Flash Lite",
+    dict(id="gemini:gemini-3.8-flash", provider="Gemini", name="Google Gemini 3.8 Flash",
+         ctx="1M", cutoff="Apr 2026", speed="~180 tok/s"),
+    dict(id="gemini:gemini-2.5-flash-lite", provider="Gemini", name="Google Gemini 2.5 Flash Lite",
          ctx="1M", cutoff="Feb 2026", speed="~210 tok/s"),
-    dict(id="gemini:gemini-3.8-flash", provider="Gemini", name="Google Gemini 3.8 Flash (Preview)",
-         ctx="1M", cutoff="Apr 2026", speed="~110 tok/s"),
+    dict(id="gemini:gemini-3.1-flash-lite", provider="Gemini", name="Google Gemini 3.1 Flash Lite",
+         ctx="1M", cutoff="Mar 2026", speed="~250 tok/s"),
 
     # --- OpenRouter Free Cluster ---
     dict(id="openrouter:google/gemma-4-31b-it:free", provider="OpenRouter", name="Gemma 4 31B IT (Free)",
@@ -103,28 +103,79 @@ CSS = """
 .stApp, .stApp p, .stApp label, .stApp li, .stApp input, .stApp textarea,
 .stApp button, .stApp h1, .stApp h2, .stApp h3{
   font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
-[data-testid="stHeader"]{background:transparent}
-[data-testid="stSidebar"]{background:var(--panel);border-right:1px solid var(--line)}
+header[data-testid="stHeader"],
+[data-testid="stHeader"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 3.75rem !important;
+  z-index: 100000 !important;
+  background: transparent !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+[data-testid="stToolbar"] {
+  pointer-events: none !important;
+}
+[data-testid="stToolbar"] > * {
+  pointer-events: auto !important;
+}
+[data-testid="stSidebar"] {
+  background: var(--panel) !important;
+  border-right: 1px solid var(--line) !important;
+  z-index: 9999 !important;
+}
+[data-testid="stSidebarCollapseButton"] {
+  z-index: 10002 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+}
+[data-testid="stSidebarCollapseButton"] button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+[data-testid="stExpandSidebarButton"] {
+  position: fixed !important;
+  top: 1rem !important;
+  left: 1rem !important;
+  z-index: 10002 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+  background: rgba(18, 22, 34, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
 .block-container{max-width:980px;padding-top:1rem;padding-bottom:7rem}
 
-/* ---- Full-Width Sticky Glass Segmented Navigation ---- */
-.st-key-nav_wrapper,
+/* ---- Full-Width Translucent Glass Segmented Navigation ---- */
+[data-testid="stLayoutWrapper"]:has(.st-key-nav_wrapper),
 [data-testid="stElementContainer"]:has(.st-key-nav_wrapper),
+[data-testid="stLayoutWrapper"]:has(.st-key-hub_nav_segmented),
 [data-testid="stElementContainer"]:has(.st-key-hub_nav_segmented),
-[data-testid="stElementContainer"]:has(.st-key-hub_nav_radio),
-.st-key-nav,
-[data-testid="stElementContainer"]:has(.st-key-nav) {
+[data-testid="stLayoutWrapper"]:has(.st-key-hub_nav_radio),
+[data-testid="stElementContainer"]:has(.st-key-hub_nav_radio) {
+  display: contents !important;
+}
+
+.st-key-nav_wrapper,
+.st-key-hub_nav_segmented,
+.st-key-hub_nav_radio,
+.st-key-nav {
   position: sticky !important;
   top: 3.75rem !important;
   z-index: 990 !important;
   width: 100% !important;
-  background: rgba(8, 9, 14, 0.95) !important;
-  backdrop-filter: blur(24px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-  padding: 0.65rem 0 !important;
-  margin: 0 0 1.5rem 0 !important;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.75) !important;
+  background: transparent !important;
+  border-bottom: none !important;
+  padding: 0 !important;
+  margin: 0 0 0.8rem 0 !important;
+  box-shadow: none !important;
 }
 
 /* 1. NATIVE st.segmented_control STYLING */
@@ -135,11 +186,11 @@ div[data-testid="stSegmentedControl"],
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
-  background: rgba(18, 21, 31, 0.85) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 16px !important;
-  padding: 4px !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  background: rgba(14, 17, 26, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 14px !important;
+  padding: 3px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.25) !important;
 }
 
 div[data-testid="stSegmentedControl"] button {
@@ -186,10 +237,12 @@ div[data-testid="stSegmentedControl"] button[data-active="true"] {
   max-width: 980px !important;
   margin: 0 auto !important;
   padding: 4px !important;
-  background: rgba(18, 21, 31, 0.85) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 16px !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  background: rgba(14, 18, 28, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
 }
 
 .st-key-nav_wrapper [role="radiogroup"] input[type="radio"],
@@ -259,6 +312,51 @@ div[data-testid="stSegmentedControl"] button[data-active="true"] {
   font-weight: 600 !important;
 }
 
+/* Claude / ChatGPT-style Floating Down-Arrow Button */
+.fx-scroll-bottom-btn {
+  position: fixed !important;
+  bottom: 5.85rem !important;
+  left: 50% !important;
+  transform: translate(-50%, 10px) scale(0.9) !important;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 50% !important;
+  background: rgba(18, 22, 34, 0.94) !important;
+  border: 1px solid rgba(99, 102, 241, 0.5) !important;
+  color: #38bdf8 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 15px rgba(99, 102, 241, 0.35) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  cursor: pointer !important;
+  z-index: 998 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease !important;
+  pointer-events: none !important;
+}
+
+.fx-scroll-bottom-btn.visible {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translate(-50%, 0) scale(1) !important;
+  pointer-events: auto !important;
+}
+
+.fx-scroll-bottom-btn:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(34, 211, 238, 0.35)) !important;
+  color: #ffffff !important;
+  border-color: rgba(34, 211, 238, 0.8) !important;
+  transform: translate(-50%, -2px) scale(1.08) !important;
+  box-shadow: 0 8px 25px rgba(34, 211, 238, 0.45) !important;
+}
+
+.fx-scroll-bottom-btn:active {
+  transform: translate(-50%, 1px) scale(0.96) !important;
+}
+
 /* ---- Chat Messages ---- */
 [data-testid="stChatMessage"]{background:var(--panel);border:1px solid var(--line-soft);
   border-radius:14px;padding:1rem 1.15rem;margin-bottom:.75rem;box-shadow:0 4px 12px rgba(0,0,0,0.25)}
@@ -309,7 +407,38 @@ div[role="dialog"] button[aria-label="Close"]:hover{
   position:fixed !important;top:1.25rem !important;right:1.5rem !important;z-index:2147483647 !important;
   background:#ef4444 !important;color:#fff !important;border:2px solid #fff !important;border-radius:9999px !important;
   padding:.55rem 1.35rem !important;font-weight:700 !important;font-size:.95rem !important;
-  box-shadow:0 4px 25px rgba(239,68,68,.85) !important;cursor:pointer !important}
+/* ---- Images: Keep Fullscreen Button Anchored on Top-Right of Image ---- */
+[data-testid="stImage"] {
+  display: inline-flex !important;
+  position: relative !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+}
+[data-testid="stImage"] > div {
+  position: relative !important;
+  width: fit-content !important;
+  display: inline-block !important;
+}
+[data-testid="stImage"] .stImageHoverButton,
+[data-testid="stImage"] [data-testid="StyledFullScreenButton"] {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  left: auto !important;
+  z-index: 25 !important;
+  opacity: 0.85 !important;
+}
+[data-testid="stImage"]:hover .stImageHoverButton,
+[data-testid="stImage"]:hover [data-testid="StyledFullScreenButton"] {
+  opacity: 1 !important;
+}
+
+[data-testid="stMainBlockContainer"],
+.block-container,
+[data-testid="stVerticalBlock"],
+[data-testid="stVerticalBlockBorderWrapper"] {
+  overflow: visible !important;
+}
 
 /* ---- Badges & Cards ---- */
 .badge{display:inline-block;margin:.35rem .35rem 0 0;padding:.12rem .55rem;border-radius:999px;
@@ -337,29 +466,8 @@ def inject_css():
 # --------------------------------------------------------------------------- #
 # 2. JS: Shortcuts & Auto-Scroll
 # --------------------------------------------------------------------------- #
-_KEYS_JS = """
-<script>
-const w = window.parent, d = w.document;
-if (!w.__hubKeys) {
-  w.__hubKeys = true;
-  d.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault();
-      if (e.shiftKey) { // Ctrl+Shift+K -> New Chat
-        const b = [...d.querySelectorAll('button')].find(x => x.innerText.includes('New chat'));
-        if (b) b.click();
-      } else { // Ctrl+K -> Focus prompt textarea
-        const t = d.querySelector('[data-testid="stChatInputTextArea"]');
-        if (t) t.focus();
-      }
-    }
-  });
-}
-</script>
-"""
-
 def inject_js():
-    components.html(_KEYS_JS, height=0)
+    pass
 
 def scroll_bottom():
     components.html(f"""<script>/*{time.time()}*/
@@ -381,7 +489,6 @@ def nav() -> str:
                 NAV,
                 default=st.session_state.nav_view,
                 selection_mode="single",
-                required=True,
                 width="stretch",
                 label_visibility="collapsed",
                 key="hub_nav_segmented"
@@ -535,8 +642,12 @@ def render_sidebar():
 # --------------------------------------------------------------------------- #
 # 6. Chat Rendering with Streaming, Files & Dock
 # --------------------------------------------------------------------------- #
-_TEXT_EXT = (".py", ".js", ".ts", ".tsx", ".json", ".md", ".txt", ".csv", ".html", ".css",
-             ".yml", ".yaml", ".ipynb", ".java", ".c", ".cpp", ".v", ".sv", ".sh", ".sql")
+_TEXT_EXT = (
+    ".py", ".js", ".ts", ".tsx", ".json", ".md", ".markdown", ".txt", ".notes", ".note",
+    ".csv", ".tsv", ".html", ".css", ".yml", ".yaml", ".ipynb", ".java", ".c", ".cpp",
+    ".h", ".hpp", ".cs", ".go", ".rs", ".v", ".sv", ".sh", ".bash", ".zsh", ".bat",
+    ".ps1", ".sql", ".log", ".rst", ".xml", ".ini", ".env", ".toml", ".conf"
+)
 
 def _badges(meta: Dict[str, Any]):
     parts = [f'⏱ {meta["secs"]:.1f}s', f'≈ {meta["tokens"]} tok', f'{meta["provider"]} · {meta["model"]}']
@@ -567,10 +678,19 @@ def render_chat(generate: Callable):
     ss = st.session_state
     sess = ss.sessions[ss.active]
 
-    for m in sess["messages"]:
+    for m_idx, m in enumerate(sess["messages"]):
         with st.chat_message(m["role"]):
             if m.get("files"):
                 st.caption("📎 " + ", ".join(m["files"]))
+            if m.get("images"):
+                for img_b in m["images"]:
+                    try:
+                        st.image(img_b, width=320)
+                    except Exception:
+                        pass
+            if m.get("media"):
+                for idx, med in enumerate(m["media"]):
+                    media_card(med.get("kind", "image"), med.get("data"), key=f"chat_med_hist_{m_idx}_{idx}")
             st.markdown(m["content"])
             if m["role"] == "assistant" and m.get("meta"):
                 _badges(m["meta"])
@@ -586,10 +706,9 @@ def render_chat(generate: Callable):
 
     # Sticky toolbar directly above prompt dock
     with st.container(key="dock_toolbar"):
-        c1, c2 = st.columns([3.5, 6.5], vertical_alignment="center")
+        c1, _ = st.columns([3.5, 6.5], vertical_alignment="center")
         with c1:
             model = model_selector()
-        c2.caption("⌨️ `Ctrl+K` focus prompt · `Ctrl+Shift+K` new chat")
 
     text, files = _read_input(_chat_input())
     text = queued or text
@@ -599,21 +718,77 @@ def render_chat(generate: Callable):
         return
 
     attachments, inline = [], []
+    chat_imgs = []
     for f in files:
         data = f.getvalue()
-        if f.name.lower().endswith(_TEXT_EXT):
-            inline.append(f"\n\n```{f.name}\n{data.decode('utf-8', 'ignore')}\n```")
+        fname_lower = f.name.lower()
+        if fname_lower.endswith(_TEXT_EXT):
+            try:
+                decoded_text = data.decode("utf-8", errors="replace")
+            except Exception:
+                decoded_text = str(data)
+            inline.append(f"\n\n--- 📄 ATTACHED FILE: {f.name} ---\n```{f.name.split('.')[-1]}\n{decoded_text}\n```\n--- END OF FILE {f.name} ---\n")
+        elif fname_lower.endswith(".pdf"):
+            extracted = ""
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(io.BytesIO(data))
+                pages_text = []
+                for p_idx, page in enumerate(reader.pages):
+                    t = page.extract_text()
+                    if t and t.strip():
+                        pages_text.append(f"[Page {p_idx+1}]\n{t.strip()}")
+                if pages_text:
+                    extracted = "\n\n".join(pages_text)
+            except Exception:
+                pass
+
+            if not extracted:
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(io.BytesIO(data)) as pdf:
+                        p_texts = []
+                        for p_idx, page in enumerate(pdf.pages):
+                            pt = page.extract_text()
+                            if pt and pt.strip():
+                                p_texts.append(f"[Page {p_idx+1}]\n{pt.strip()}")
+                        if p_texts:
+                            extracted = "\n\n".join(p_texts)
+                except Exception:
+                    pass
+
+            if extracted:
+                inline.append(f"\n\n--- 📑 ATTACHED PDF: {f.name} ---\n{extracted}\n--- END OF PDF {f.name} ---\n")
+            else:
+                inline.append(f"\n\n--- 📑 ATTACHED PDF: {f.name} ({len(data)} bytes, document ready for analysis) ---\n")
+            attachments.append({"name": f.name, "mime": "application/pdf", "data": data})
+        elif f.type.startswith("image/") or fname_lower.endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif')):
+            attachments.append({"name": f.name, "mime": f.type or "image/png", "data": data})
+            chat_imgs.append(data)
         else:
-            attachments.append({"name": f.name, "mime": f.type, "data": data})
+            try:
+                decoded_text = data.decode("utf-8")
+                inline.append(f"\n\n--- 📄 ATTACHED FILE: {f.name} ---\n```\n{decoded_text}\n```\n--- END OF FILE {f.name} ---\n")
+            except Exception:
+                attachments.append({"name": f.name, "mime": f.type, "data": data})
     full = text + "".join(inline)
 
-    sess["messages"].append({"role": "user", "content": full, "files": [f.name for f in files]})
+    msg_record = {"role": "user", "content": full, "files": [f.name for f in files]}
+    if chat_imgs:
+        msg_record["images"] = chat_imgs
+    sess["messages"].append(msg_record)
     if sess["title"] == "New chat":
         sess["title"] = text[:36]
     sess["ts"] = time.time()
     with st.chat_message("user"):
         if files:
             st.caption("📎 " + ", ".join(f.name for f in files))
+        if chat_imgs:
+            for img_b in chat_imgs:
+                try:
+                    st.image(img_b, width=320)
+                except Exception:
+                    pass
         st.markdown(full)
 
     msgs = [{"role": m["role"], "content": m["content"]} for m in sess["messages"]]
@@ -629,11 +804,22 @@ def render_chat(generate: Callable):
         except Exception as e:
             reply = f"⚠️ {model['provider']} failed: `{e}`"
             st.error(reply)
+
+        gen_media = ss.pop("_last_generated_media", None)
+        if gen_media:
+            if not isinstance(gen_media, list):
+                gen_media = [gen_media]
+            for idx, med in enumerate(gen_media):
+                media_card(med.get("kind", "image"), med.get("data"), key=f"chat_med_live_{int(time.time())}_{idx}")
+
         meta = {"secs": time.perf_counter() - t0, "tokens": max(1, len(reply) // 4),
                 "provider": model["provider"], "model": model["name"]}
         _badges(meta)
 
-    sess["messages"].append({"role": "assistant", "content": reply, "meta": meta})
+    msg_record = {"role": "assistant", "content": reply, "meta": meta}
+    if gen_media:
+        msg_record["media"] = gen_media
+    sess["messages"].append(msg_record)
     try:
         from session_manager import save_session
         save_session(ss.active, sess["title"], sess["messages"])
@@ -673,17 +859,32 @@ def _preview(kind: str, src):
 
 def media_card(kind: str, src, key: str):
     """kind = 'image' | 'video' | 'audio'; src = url, path or bytes."""
+    is_min = st.session_state.get(f"min_{key}", False)
+    if is_min:
+        m_c1, m_c2 = st.columns([7.5, 2.5], vertical_alignment="center")
+        icon = "🎵" if kind == "audio" else ("🎬" if kind == "video" else "🖼️")
+        m_c1.caption(f"{icon} {kind.capitalize()} minimized")
+        if m_c2.button(f"➕ Expand {kind.capitalize()}", key=f"unmin_{key}", use_container_width=True):
+            st.session_state[f"min_{key}"] = False
+            st.rerun()
+        return
+
     if kind == "image":
         st.image(src, use_container_width=True)
     elif kind == "video":
         st.video(src)
     elif kind == "audio":
         st.audio(src)
-    c1, c2 = st.columns([1, 1])
+
+    c1, c2, c3 = st.columns([1, 1, 1])
     with c1:
-        if st.button("⛶ Expand Fullscreen", key=f"exp_{key}", use_container_width=True):
+        if st.button("⛶ Fullscreen", key=f"exp_{key}", use_container_width=True):
             _preview(kind, src)
     with c2:
+        if st.button("➖ Minimize", key=f"min_btn_{key}", use_container_width=True):
+            st.session_state[f"min_{key}"] = True
+            st.rerun()
+    with c3:
         if isinstance(src, bytes):
             ext = "png" if kind == "image" else ("mp4" if kind == "video" else "wav")
             mime = f"image/{ext}" if kind == "image" else (f"video/{ext}" if kind == "video" else f"audio/{ext}")
