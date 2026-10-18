@@ -156,8 +156,20 @@ button[data-testid="stBaseButton-primary"]{background:var(--accent);border-color
 [data-testid="stPopoverBody"] [role="radiogroup"] label:has(input:checked){
   background:var(--accent-soft);border-color:rgba(99,102,241,.4)}
 
-/* ---- Dialog (Native Close & Esc) ---- */
+/* ---- Dialog (Native Close & Esc) & Fullscreen Frame ---- */
 div[role="dialog"]{background:var(--panel);border:1px solid var(--line);border-radius:16px}
+div[role="dialog"] button[aria-label="Close"]{
+  background:rgba(239,68,68,.2) !important;border:1px solid rgba(239,68,68,.5) !important;
+  color:#fca5a5 !important;border-radius:8px !important;padding:4px 8px !important;
+  font-weight:700 !important;transition:all var(--ease) !important}
+div[role="dialog"] button[aria-label="Close"]:hover{
+  background:#ef4444 !important;color:#fff !important;box-shadow:0 0 15px rgba(239,68,68,.6) !important}
+[data-testid="stFullScreenFrame"]{z-index:2147483640 !important;background:rgba(7,8,13,.98) !important}
+[data-testid="stFullScreenFrame"] button{
+  position:fixed !important;top:1.25rem !important;right:1.5rem !important;z-index:2147483647 !important;
+  background:#ef4444 !important;color:#fff !important;border:2px solid #fff !important;border-radius:9999px !important;
+  padding:.55rem 1.35rem !important;font-weight:700 !important;font-size:.95rem !important;
+  box-shadow:0 4px 25px rgba(239,68,68,.85) !important;cursor:pointer !important}
 
 /* ---- Badges & Cards ---- */
 .badge{display:inline-block;margin:.35rem .35rem 0 0;padding:.12rem .55rem;border-radius:999px;
@@ -462,20 +474,49 @@ def render_chat(generate: Callable):
     st.rerun()
 
 # --------------------------------------------------------------------------- #
-# 7. Media Preview with Native st.dialog (Working Close & Esc)
+# 7. Media Preview with Native st.dialog (Working Close, Esc & Minimize)
 # --------------------------------------------------------------------------- #
-@st.dialog("Media Preview", width="large")
+@st.dialog("Media Preview & Fullscreen", width="large")
 def _preview(kind: str, src):
+    top_c1, top_c2 = st.columns([3.5, 1.5])
+    with top_c1:
+        st.markdown(f"#### ⛶ Fullscreen {kind.capitalize()} Viewer")
+    with top_c2:
+        if st.button("✕ Close (Esc)", key=f"preview_close_top_{kind}", type="primary", use_container_width=True):
+            st.rerun()
+
     if kind == "image":
         st.image(src, use_container_width=True)
-    else:
+    elif kind == "video":
         st.video(src)
+    elif kind == "audio":
+        st.audio(src)
+
+    bot_c1, bot_c2 = st.columns([1, 1])
+    with bot_c1:
+        if st.button("✕ Exit Fullscreen", key=f"preview_close_bot_{kind}", use_container_width=True):
+            st.rerun()
+    with bot_c2:
+        if isinstance(src, bytes):
+            ext = "png" if kind == "image" else ("mp4" if kind == "video" else "wav")
+            mime = f"image/{ext}" if kind == "image" else (f"video/{ext}" if kind == "video" else f"audio/{ext}")
+            st.download_button(f"⬇️ Download {kind.capitalize()}", data=src, file_name=f"media_export.{ext}", mime=mime, key=f"dl_dlg_{kind}", use_container_width=True)
 
 def media_card(kind: str, src, key: str):
-    """kind = 'image' | 'video'; src = url, path or bytes."""
+    """kind = 'image' | 'video' | 'audio'; src = url, path or bytes."""
     if kind == "image":
         st.image(src, use_container_width=True)
-    else:
+    elif kind == "video":
         st.video(src)
-    if st.button("⛶ Expand Fullscreen", key=f"exp_{key}"):
-        _preview(kind, src)
+    elif kind == "audio":
+        st.audio(src)
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        if st.button("⛶ Expand Fullscreen", key=f"exp_{key}", use_container_width=True):
+            _preview(kind, src)
+    with c2:
+        if isinstance(src, bytes):
+            ext = "png" if kind == "image" else ("mp4" if kind == "video" else "wav")
+            mime = f"image/{ext}" if kind == "image" else (f"video/{ext}" if kind == "video" else f"audio/{ext}")
+            st.download_button("⬇️ Download", data=src, file_name=f"{key}.{ext}", mime=mime, key=f"dl_card_{key}", use_container_width=True)
+

@@ -138,6 +138,53 @@ def health():
         "cuda_version": torch.version.cuda if gpu_available else None
     }
 
+# ----------------- VISUAL PROMPT ENHANCER FOR GAME LANDMARKS -----------------
+def enrich_prompt_for_visuals(prompt: str) -> str:
+    """Enriches natural language and gaming prompts with rich visual descriptors
+    so diffusion models accurately understand game maps, characters, and cinematic cues."""
+    p = prompt.strip()
+    low = p.lower()
+
+    # Free Fire iconic map locations
+    if ("freefire" in low or "free fire" in low or "ff " in low or "garena" in low) and "peak" in low:
+        return (
+            "Garena Free Fire iconic Bermuda Old Peak location, classic two-story wooden colonial mansion "
+            "on a high hill plateau, red-shingled roof, wooden veranda balcony, battle royale landscape, "
+            "military watchtower, tactical loot crates, supply airdrop smoke beacon in distance, tropical trees, "
+            "cinematic low angle perspective, dramatic golden hour lighting, Unreal Engine 5 render, "
+            "hyper-detailed 8k resolution, authentic battle royale game aesthetic"
+        )
+    elif ("freefire" in low or "free fire" in low) and ("clock tower" in low or "clocktower" in low):
+        return (
+            "Garena Free Fire iconic Bermuda Clock Tower location, tall brick clock tower with ornate circular dial, "
+            "surrounding stone courtyard plaza, two-story tactical buildings, loot supply boxes, "
+            "battle royale compound, cinematic wide shot, dramatic sunset rays, Unreal Engine 5 8k render"
+        )
+    elif ("freefire" in low or "free fire" in low) and ("factory" in low or "bimasakti" in low):
+        return (
+            "Garena Free Fire Bermuda Factory and Bimasakti Strip, industrial metal warehouse roofs, "
+            "tactical ladders, battle royale arena, dramatic lighting, cinematic camera angle, 8k render"
+        )
+    elif "freefire" in low or "free fire" in low:
+        return (
+            f"{p}, Garena Free Fire battle royale aesthetic, tactical military gear, "
+            "vibrant gaming atmosphere, cinematic lighting, 8k resolution, Unreal Engine 5 render"
+        )
+    
+    # PUBG / BGMI iconic locations
+    elif ("pubg" in low or "bgmi" in low) and "pochinki" in low:
+        return (
+            "PUBG Erangel iconic Pochinki town, Soviet-era brick residential buildings, church with bell tower, "
+            "dirt roads, tactical battle royale compound, cinematic wide angle, dramatic overcast sky, photorealistic 8k"
+        )
+    elif ("pubg" in low or "bgmi" in low) and ("military" in low or "sosnovka" in low):
+        return (
+            "PUBG Erangel Sosnovka Military Base, giant radar dish tower, rusted metal hangars, "
+            "concrete barracks, battle royale landscape, dramatic cinematic lighting, 8k"
+        )
+
+    return p
+
 class ImageGenRequest(BaseModel):
     prompt: str
     width: int = 1024
@@ -150,10 +197,11 @@ def generate_image(req: ImageGenRequest):
         pipe = get_image_pipeline()
         steps = max(1, min(req.num_inference_steps, 4))
         name = getattr(pipe, "_name_or_path", "").lower()
+        active_prompt = enrich_prompt_for_visuals(req.prompt)
         if "turbo" in name:
-            img = pipe(prompt=req.prompt, num_inference_steps=steps, guidance_scale=0.0).images[0]
+            img = pipe(prompt=active_prompt, num_inference_steps=steps, guidance_scale=0.0).images[0]
         else:
-            img = pipe(prompt=req.prompt, num_inference_steps=20, guidance_scale=7.5).images[0]
+            img = pipe(prompt=active_prompt, num_inference_steps=20, guidance_scale=7.5).images[0]
         if (img.width, img.height) != (req.width, req.height):
             img = img.resize((req.width, req.height), Image.Resampling.LANCZOS)
         buf = io.BytesIO()
@@ -178,9 +226,10 @@ def generate_video(req: VideoGenRequest):
         diff_h = 256
         diff_w = 384 if req.width >= req.height else 256
         num_frames = max(16, min(int(req.duration * 6), 32))
+        active_prompt = enrich_prompt_for_visuals(req.prompt)
         print(f"Synthesizing {num_frames} frames of true 3D spatio-temporal diffusion...")
         video_out = pipe(
-            req.prompt,
+            active_prompt,
             num_frames=num_frames,
             height=diff_h,
             width=diff_w,
@@ -322,9 +371,18 @@ def generate_audio_endpoint(req: AudioGenRequest):
         p = req.prompt.lower()
 
         # 1. Classify style, tempo & harmonic chord progression
-        if any(k in p for k in ['gaming', 'free fire', 'game', 'battle', 'combat', 'boss', 'k character', 'action', 'rush', 'war', 'fight', 'gun']):
+        if any(k in p for k in ['saiyara', 'bollywood', 'hindi', 'romantic', 'love', 'melody', 'melodious', 'indian', 'desi', 'acoustic', 'flute', 'bansuri', 'sitar', 'violin', 'strings', 'emotional', 'serenade', 'song', 'heart', 'soul', 'acoustic guitar']):
+            style = 'romantic'
+            bpm = 74.0
+            chords = [
+                [164.81, 196.00, 246.94, 293.66, 370.00], # Em9
+                [130.81, 164.81, 196.00, 246.94, 329.63], # Cmaj7
+                [98.00, 146.83, 196.00, 246.94, 293.66],  # Gmaj9
+                [146.83, 185.00, 220.00, 293.66, 370.00]  # Dadd9
+            ]
+        elif any(k in p for k in ['gaming', 'free fire', 'game', 'battle', 'combat', 'boss', 'k character', 'action', 'rush', 'war', 'fight', 'gun']):
             style = 'gaming'
-            bpm = 140.0
+            bpm = 136.0
             chords = [
                 [146.83, 174.61, 220.00, 293.66], # Dm
                 [116.54, 146.83, 174.61, 233.08], # Bb
@@ -333,7 +391,7 @@ def generate_audio_endpoint(req: AudioGenRequest):
             ]
         elif any(k in p for k in ['edm', 'dance', 'techno', 'house', 'rave', 'club', 'drop', 'dj', 'remix']):
             style = 'edm'
-            bpm = 128.0
+            bpm = 126.0
             chords = [
                 [174.61, 220.00, 261.63, 349.23], # F
                 [130.81, 164.81, 196.00, 261.63], # C
@@ -349,16 +407,16 @@ def generate_audio_endpoint(req: AudioGenRequest):
                 [103.83, 130.81, 155.56, 207.65], # Ab
                 [116.54, 146.83, 174.61, 233.08]  # Bb
             ]
-        elif any(k in p for k in ['rock', 'metal', 'guitar', 'punk', 'heavy', 'riff']):
+        elif any(k in p for k in ['rock', 'metal', 'punk', 'heavy', 'riff']):
             style = 'rock'
-            bpm = 132.0
+            bpm = 130.0
             chords = [
                 [82.41, 123.47, 164.81],   # E5
                 [98.00, 146.83, 196.00],   # G5
                 [65.41, 98.00, 130.81],    # C5
                 [73.42, 110.00, 146.83]    # D5
             ]
-        elif any(k in p for k in ['piano', 'acoustic', 'classical', 'emotional', 'ballad', 'melancholy', 'sad']):
+        elif any(k in p for k in ['piano', 'classical', 'ballad', 'melancholy', 'sad']):
             style = 'piano'
             bpm = 76.0
             chords = [
@@ -385,9 +443,9 @@ def generate_audio_endpoint(req: AudioGenRequest):
                 [146.83, 174.61, 220.00, 261.63, 349.23], # Dm9
                 [98.00, 146.83, 196.00, 246.94, 293.66]   # G9
             ]
-        elif any(k in p for k in ['epic', 'orchestral', 'tension', 'cinematic', 'brass', 'strings', 'timpani', 'trailer']):
+        elif any(k in p for k in ['epic', 'orchestral', 'tension', 'cinematic', 'brass', 'timpani', 'trailer']):
             style = 'epic'
-            bpm = 94.0
+            bpm = 92.0
             chords = [
                 [65.41, 130.81, 196.00, 261.63, 311.13], # Cm
                 [51.91, 103.83, 155.56, 207.65, 261.63], # Ab
@@ -396,7 +454,7 @@ def generate_audio_endpoint(req: AudioGenRequest):
             ]
         elif any(k in p for k in ['cyberpunk', 'synthwave', '80s', 'retro', 'neon', 'synth']):
             style = 'cyber'
-            bpm = 118.0
+            bpm = 116.0
             chords = [
                 [146.83, 220.00, 261.63, 349.23], # Dm
                 [116.54, 174.61, 233.08, 293.66], # Bb
@@ -404,15 +462,16 @@ def generate_audio_endpoint(req: AudioGenRequest):
                 [130.81, 196.00, 261.63, 329.63]  # C
             ]
         else:
+            # Dynamic procedural atmospheric synthesis (melodic, gentle, balanced)
             h_val = abs(hash(req.prompt))
-            bpm = 88.0 + float(h_val % 52)
+            bpm = 76.0 + float(h_val % 28)
             root_base = 130.81 * (2.0 ** ((h_val % 12) / 12.0))
-            style = 'gaming' if (h_val % 2 == 0) else 'cyber'
+            style = 'ambient_melody'
             chords = [
-                [root_base, root_base * 1.2, root_base * 1.5],
-                [root_base * 0.89, root_base * 1.07, root_base * 1.33],
-                [root_base * 0.75, root_base * 0.94, root_base * 1.12],
-                [root_base * 0.84, root_base * 1.05, root_base * 1.26]
+                [root_base, root_base * 1.25, root_base * 1.5, root_base * 1.875],
+                [root_base * 0.89, root_base * 1.12, root_base * 1.33, root_base * 1.67],
+                [root_base * 0.75, root_base * 0.94, root_base * 1.12, root_base * 1.41],
+                [root_base * 0.84, root_base * 1.05, root_base * 1.26, root_base * 1.58]
             ]
 
         beat_dur = 60.0 / bpm
@@ -424,7 +483,7 @@ def generate_audio_endpoint(req: AudioGenRequest):
         np.random.seed(int(abs(hash(req.prompt))) % 100000)
         white_noise = np.random.uniform(-1.0, 1.0, len(t))
 
-        # 1. STUDIO PUNCH KICK
+        # 1. KICK / PERCUSSION
         tau_k = t_beat
         k_phase = 2.0 * np.pi * (45.0 * tau_k - (115.0 / 35.0) * (np.exp(-35.0 * tau_k) - 1.0))
         k_pulse = np.sin(k_phase) * (0.85 * np.exp(-16.0 * tau_k) + 0.35 * np.exp(-70.0 * tau_k))
@@ -432,23 +491,26 @@ def generate_audio_endpoint(req: AudioGenRequest):
         if style in ['gaming', 'edm']:
             kick = k_pulse
         elif style == 'trap':
-            k_mask = (beat_num == 0) | ((beat_num == 2) & (t_beat > beat_dur * 0.5)) | ((beat_num == 3) & (t_beat > beat_dur * 0.75))
-            kick = k_pulse * k_mask * 1.2
-        elif style == 'rock':
-            k_mask = (beat_num == 0) | (beat_num == 2) | ((beat_num == 1) & (t_beat > beat_dur * 0.5))
+            k_mask = (beat_num == 0) | ((beat_num == 2) & (t_beat > beat_dur * 0.5))
             kick = k_pulse * k_mask * 1.1
+        elif style == 'rock':
+            k_mask = (beat_num == 0) | (beat_num == 2)
+            kick = k_pulse * k_mask
         elif style == 'lofi':
             k_mask = (beat_num == 0) | ((beat_num == 2) & (t_beat > beat_dur * 0.35))
-            kick = k_pulse * k_mask * 0.8
+            kick = k_pulse * k_mask * 0.7
+        elif style == 'romantic':
+            bayan_phase = 2.0 * np.pi * (62.0 - 15.0 * np.exp(-28.0 * tau_k)) * tau_k
+            kick = np.sin(bayan_phase) * np.exp(-11.0 * tau_k) * ((beat_num == 0) | (beat_num == 2)) * 0.65
         elif style == 'epic':
             timp_phase = 2.0 * np.pi * (38.0 * tau_k - (90.0 / 15.0) * (np.exp(-15.0 * tau_k) - 1.0))
-            kick = np.sin(timp_phase) * np.exp(-9.0 * tau_k) * ((beat_num == 0) | (beat_num == 2)) * 1.4
+            kick = np.sin(timp_phase) * np.exp(-9.0 * tau_k) * ((beat_num == 0) | (beat_num == 2)) * 1.2
         elif style == 'piano':
             kick = np.zeros_like(t)
         else:
-            kick = k_pulse * ((beat_num == 0) | (beat_num == 2)) * 0.7
+            kick = k_pulse * ((beat_num == 0) | (beat_num == 2)) * 0.5
 
-        # 2. STUDIO SNARE / CLAP
+        # 2. SNARE / CLAP
         tau_s = t_beat
         s_tone = np.sin(2.0 * np.pi * 185.0 * tau_s) * np.exp(-28.0 * tau_s)
         s_noise = white_noise * np.exp(-22.0 * tau_s)
@@ -456,177 +518,172 @@ def generate_audio_endpoint(req: AudioGenRequest):
 
         if style in ['gaming', 'edm', 'rock', 'cyber']:
             snare_mask = (beat_num == 1) | (beat_num == 3)
-            snare = snare_hit * snare_mask * 0.95
+            snare = snare_hit * snare_mask * 0.85
         elif style == 'trap':
-            snare_mask = (beat_num == 2)
-            snare = snare_hit * snare_mask * 1.15
+            snare = snare_hit * (beat_num == 2) * 1.0
         elif style == 'lofi':
-            snare_mask = (beat_num == 1) | (beat_num == 3)
-            snare = (0.25 * s_tone + 0.35 * s_noise) * snare_mask * 0.65
+            snare = (0.2 * s_tone + 0.3 * s_noise) * ((beat_num == 1) | (beat_num == 3)) * 0.5
+        elif style == 'romantic':
+            snare = white_noise * np.exp(-45.0 * tau_s) * ((beat_num == 1) | (beat_num == 3)) * 0.22
         elif style == 'epic':
-            snare = white_noise * np.exp(-14.0 * tau_s) * (beat_num == 2) * 0.5
+            snare = white_noise * np.exp(-14.0 * tau_s) * (beat_num == 2) * 0.45
         else:
             snare = np.zeros_like(t)
 
-        # 3. HI-HATS & SHAKERS
+        # 3. HI-HATS / SHAKERS
         hat = np.zeros_like(t)
         if style in ['gaming', 'trap']:
             t_16 = t % (beat_dur / 4.0)
-            hat = white_noise * np.exp(-65.0 * t_16) * 0.22
-            is_roll = (beat_num == 3)
-            if np.any(is_roll):
-                t_32 = t % (beat_dur / 8.0)
-                hat[is_roll] = (white_noise * np.exp(-80.0 * t_32) * 0.26)[is_roll]
+            hat = white_noise * np.exp(-65.0 * t_16) * 0.16
         elif style == 'edm':
             t_off = (t - beat_dur * 0.5) % beat_dur
-            hat = white_noise * np.exp(-25.0 * t_off) * (t_off < beat_dur * 0.45) * 0.20
-        elif style == 'rock':
+            hat = white_noise * np.exp(-25.0 * t_off) * (t_off < beat_dur * 0.45) * 0.15
+        elif style == 'romantic':
             t_8 = t % (beat_dur / 2.0)
-            hat = white_noise * np.exp(-35.0 * t_8) * 0.24
-        elif style == 'lofi':
+            hat = white_noise * np.exp(-50.0 * t_8) * 0.08
+        elif style in ['lofi', 'ambient_melody']:
             t_8 = t % (beat_dur / 2.0)
-            hat = (white_noise * 0.02 + white_noise * np.exp(-55.0 * t_8) * 0.09)
-        elif style == 'space':
-            swell = 0.5 * (1.0 + np.sin(2.0 * np.pi * 0.2 * t))
-            hat = white_noise * 0.03 * swell
+            hat = (white_noise * 0.015 + white_noise * np.exp(-55.0 * t_8) * 0.06)
 
-        # 4. CHORD PADS & SYNTHESIZERS
+        # 4. CHORD PADS & ENSEMBLE
         pad_L = np.zeros_like(t)
         pad_R = np.zeros_like(t)
-        sc_env = 0.35 + 0.65 * (1.0 - np.exp(-12.0 * t_beat)) if style in ['gaming', 'edm'] else 1.0
+        sc_env = 0.4 + 0.6 * (1.0 - np.exp(-12.0 * t_beat)) if style in ['gaming', 'edm'] else 1.0
 
         for c_i, c_notes in enumerate(chords):
             mask = (chord_idx == c_i)
-            if not np.any(mask):
-                continue
+            if not np.any(mask): continue
             t_sub = t[mask]
-            norm = 0.42 / len(c_notes)
+            norm = 0.38 / len(c_notes)
             for note_f in c_notes:
-                if style in ['gaming', 'edm', 'cyber']:
-                    v_l = (0.50 * np.sin(2*np.pi*note_f*t_sub) + 
-                           0.30 * np.sin(4*np.pi*(note_f*1.004)*t_sub) + 
-                           0.15 * np.sin(6*np.pi*(note_f*0.996)*t_sub) +
-                           0.05 * np.sin(8*np.pi*note_f*t_sub))
-                    v_r = (0.50 * np.sin(2*np.pi*note_f*t_sub) + 
-                           0.30 * np.sin(4*np.pi*(note_f*0.996)*t_sub) + 
-                           0.15 * np.sin(6*np.pi*(note_f*1.004)*t_sub) +
-                           0.05 * np.sin(8*np.pi*note_f*t_sub))
+                if style == 'romantic':
+                    v_l = (0.6 * np.sin(2*np.pi*note_f*t_sub) + 0.3 * np.sin(2*np.pi*(note_f*1.002)*t_sub) + 0.1 * np.sin(4*np.pi*note_f*t_sub))
+                    v_r = (0.6 * np.sin(2*np.pi*note_f*t_sub) + 0.3 * np.sin(2*np.pi*(note_f*0.998)*t_sub) + 0.1 * np.sin(4*np.pi*note_f*t_sub))
+                elif style in ['gaming', 'edm', 'cyber']:
+                    v_l = (0.50 * np.sin(2*np.pi*note_f*t_sub) + 0.30 * np.sin(4*np.pi*(note_f*1.003)*t_sub) + 0.15 * np.sin(6*np.pi*note_f*t_sub))
+                    v_r = (0.50 * np.sin(2*np.pi*note_f*t_sub) + 0.30 * np.sin(4*np.pi*(note_f*0.997)*t_sub) + 0.15 * np.sin(6*np.pi*note_f*t_sub))
                 elif style in ['piano', 'lofi']:
                     t_n = (t_sub % (bar_dur / 2.0))
                     env = np.exp(-2.2 * t_n)
-                    v_l = (0.55 * np.sin(2*np.pi*note_f*t_sub) + 0.28 * np.sin(4*np.pi*note_f*t_sub) + 0.12 * np.sin(6*np.pi*note_f*t_sub)) * env
-                    v_r = (0.55 * np.sin(2*np.pi*note_f*t_sub) + 0.28 * np.sin(4*np.pi*note_f*t_sub) + 0.12 * np.sin(6*np.pi*note_f*t_sub)) * env
-                elif style == 'rock':
-                    raw = np.sin(2*np.pi*note_f*t_sub) + 0.4 * np.sin(4*np.pi*note_f*t_sub) + 0.25 * np.sin(6*np.pi*note_f*t_sub)
-                    dist = np.tanh(raw * 2.8)
-                    v_l = dist; v_r = dist
+                    v_l = (0.6 * np.sin(2*np.pi*note_f*t_sub) + 0.25 * np.sin(4*np.pi*note_f*t_sub)) * env
+                    v_r = (0.6 * np.sin(2*np.pi*note_f*t_sub) + 0.25 * np.sin(4*np.pi*note_f*t_sub)) * env
                 else:
-                    lfo = 0.75 + 0.25 * np.sin(2.0 * np.pi * 0.25 * t_sub)
-                    v_l = (0.5 * np.sin(2*np.pi*note_f*t_sub) + 0.35 * np.sin(2*np.pi*(note_f*1.003)*t_sub)) * lfo
-                    v_r = (0.5 * np.sin(2*np.pi*note_f*t_sub) + 0.35 * np.sin(2*np.pi*(note_f*0.997)*t_sub)) * lfo
+                    lfo = 0.8 + 0.2 * np.sin(2.0 * np.pi * 0.25 * t_sub)
+                    v_l = (0.55 * np.sin(2*np.pi*note_f*t_sub) + 0.3 * np.sin(2*np.pi*(note_f*1.002)*t_sub)) * lfo
+                    v_r = (0.55 * np.sin(2*np.pi*note_f*t_sub) + 0.3 * np.sin(2*np.pi*(note_f*0.998)*t_sub)) * lfo
 
                 pad_L[mask] += v_l * norm
                 pad_R[mask] += v_r * norm
 
         if isinstance(sc_env, np.ndarray) or sc_env != 1.0:
-            pad_L *= sc_env
-            pad_R *= sc_env
+            pad_L *= sc_env; pad_R *= sc_env
 
-        # 5. SUB-BASS & 808
+        # 5. SUB-BASS
         bass = np.zeros_like(t)
         for c_i, c_notes in enumerate(chords):
             mask = (chord_idx == c_i)
-            if not np.any(mask):
-                continue
+            if not np.any(mask): continue
             root_f = c_notes[0] * 0.5
             t_sub = t[mask]
-
+            t_b = (t_sub % beat_dur)
             if style in ['gaming', 'trap', 'edm']:
-                t_b = (t_sub % beat_dur)
                 b_env = np.exp(-4.5 * t_b)
-                glide = 1.0 + 0.25 * np.exp(-35.0 * t_b)
-                phase = 2.0 * np.pi * root_f * t_sub * glide
-                sub_raw = (0.75 * np.sin(phase) + 0.25 * np.sin(2.0 * phase)) * b_env
-                bass[mask] = np.tanh(sub_raw * 2.2) * 1.1
-            elif style == 'rock':
-                t_b = (t_sub % (beat_dur / 2.0))
-                b_env = np.exp(-6.0 * t_b)
-                bass[mask] = (0.7 * np.sin(2*np.pi*root_f*t_sub) + 0.3 * np.sin(4*np.pi*root_f*t_sub)) * b_env
+                phase = 2.0 * np.pi * root_f * t_sub
+                bass[mask] = np.sin(phase) * b_env * 0.85
             else:
-                t_b = (t_sub % beat_dur)
-                b_env = np.exp(-3.0 * t_b)
-                bass[mask] = np.sin(2*np.pi*root_f*t_sub) * b_env * 0.9
+                b_env = np.exp(-2.5 * t_b)
+                bass[mask] = np.sin(2*np.pi*root_f*t_sub) * b_env * 0.7
 
-        # 6. ENERGETIC MELODY & ARPEGGIO
-        arp_L = np.zeros_like(t)
-        arp_R = np.zeros_like(t)
-        div = 4.0 if style in ['gaming', 'edm', 'cyber', 'trap'] else 2.0
-        t_arp = t % (beat_dur / div)
-        arp_step = np.floor(t / (beat_dur / div)).astype(int) % 8
-        a_env = np.exp(-14.0 * t_arp)
+        # 6. MELODIC LINE / INSTRUMENT LEAD (Musical & Pleasant, NO Harsh Bips)
+        lead_L = np.zeros_like(t)
+        lead_R = np.zeros_like(t)
 
-        for c_i, c_notes in enumerate(chords):
-            mask = (chord_idx == c_i)
-            if not np.any(mask):
-                continue
-            t_sub = t[mask]
-            step_sub = arp_step[mask]
+        if style == 'romantic':
+            t_p = t % (beat_dur / 2.0)
+            p_step = np.floor(t / (beat_dur / 2.0)).astype(int) % 8
+            p_env = np.exp(-6.0 * t_p)
+            for c_i, c_notes in enumerate(chords):
+                mask = (chord_idx == c_i)
+                if not np.any(mask): continue
+                t_sub = t[mask]
+                s_sub = p_step[mask]
+                freqs = np.array([c_notes[s % len(c_notes)] for s in s_sub])
+                sig = (np.sin(2*np.pi*freqs*t_sub) + 0.35*np.sin(4*np.pi*freqs*t_sub)) * p_env[mask]
+                is_even = (s_sub % 2 == 0)
+                lead_L[mask] += sig * np.where(is_even, 0.75, 0.25) * 0.35
+                lead_R[mask] += sig * np.where(is_even, 0.25, 0.75) * 0.35
 
-            if style in ['gaming', 'action']:
-                oct_mult = np.where(step_sub % 3 == 0, 3.0, 2.0)
-                arp_freqs = np.array([c_notes[s % len(c_notes)] * m for s, m in zip(step_sub, oct_mult)])
-                tone = (np.sin(2*np.pi*arp_freqs*t_sub) + 
-                        0.4 * np.sin(4*np.pi*arp_freqs*t_sub) + 
-                        0.2 * np.sin(6*np.pi*arp_freqs*t_sub)) * a_env[mask]
-            elif style == 'piano':
-                arp_freqs = np.array([c_notes[s % len(c_notes)] * 2.0 for s in step_sub])
+            flute_notes = [493.88, 587.33, 659.25, 783.99, 659.25, 587.33, 493.88, 440.00]
+            note_dur = beat_dur
+            flute_idx = np.floor(t / note_dur).astype(int) % len(flute_notes)
+            t_note = t % note_dur
+            flute_env = (np.sin(np.pi * (t_note / note_dur)) ** 0.6) * (t_note < note_dur * 0.95)
+            f_freqs = np.array([flute_notes[i] for i in flute_idx])
+            vib = 1.0 + 0.012 * np.sin(2 * np.pi * 5.2 * t)
+            f_phase = 2 * np.pi * f_freqs * vib * t
+            flute_sig = (np.sin(f_phase) + 0.22 * np.sin(2 * f_phase)) * flute_env * 0.40
+            lead_L += flute_sig * 0.5
+            lead_R += flute_sig * 0.5
+
+        else:
+            div = 2.0
+            t_arp = t % (beat_dur / div)
+            arp_step = np.floor(t / (beat_dur / div)).astype(int) % 8
+            a_env = np.exp(-6.5 * t_arp)
+            for c_i, c_notes in enumerate(chords):
+                mask = (chord_idx == c_i)
+                if not np.any(mask): continue
+                t_sub = t[mask]
+                step_sub = arp_step[mask]
+                arp_freqs = np.array([c_notes[s % len(c_notes)] for s in step_sub])
                 tone = (np.sin(2*np.pi*arp_freqs*t_sub) + 0.25 * np.sin(4*np.pi*arp_freqs*t_sub)) * a_env[mask]
-            else:
-                arp_freqs = np.array([c_notes[s % len(c_notes)] * 2.0 for s in step_sub])
-                tone = (np.sin(2*np.pi*arp_freqs*t_sub) + 0.3 * np.sin(4*np.pi*arp_freqs*t_sub)) * a_env[mask]
-
-            is_even = (step_sub % 2 == 0)
-            arp_L[mask] += tone * (np.where(is_even, 0.85, 0.15) * 0.28)
-            arp_R[mask] += tone * (np.where(is_even, 0.15, 0.85) * 0.28)
+                is_even = (step_sub % 2 == 0)
+                lead_L[mask] += tone * (np.where(is_even, 0.75, 0.25) * 0.30)
+                lead_R[mask] += tone * (np.where(is_even, 0.25, 0.75) * 0.30)
 
         # 7. MASTER STEREO SUMMING
-        if style in ['gaming', 'action']:
-            L = 0.35 * pad_L + 0.42 * bass + 0.45 * kick + 0.32 * snare + 0.18 * hat + 0.35 * arp_L
-            R = 0.35 * pad_R + 0.42 * bass + 0.45 * kick + 0.32 * snare + 0.18 * hat + 0.35 * arp_R
+        if style == 'romantic':
+            L = 0.45 * pad_L + 0.28 * bass + 0.35 * kick + 0.15 * snare + 0.10 * hat + 0.50 * lead_L
+            R = 0.45 * pad_R + 0.28 * bass + 0.35 * kick + 0.15 * snare + 0.10 * hat + 0.50 * lead_R
+        elif style in ['gaming', 'action']:
+            L = 0.40 * pad_L + 0.40 * bass + 0.42 * kick + 0.28 * snare + 0.15 * hat + 0.32 * lead_L
+            R = 0.40 * pad_R + 0.40 * bass + 0.42 * kick + 0.28 * snare + 0.15 * hat + 0.32 * lead_R
         elif style == 'edm':
-            L = 0.40 * pad_L + 0.38 * bass + 0.48 * kick + 0.30 * snare + 0.20 * hat + 0.32 * arp_L
-            R = 0.40 * pad_R + 0.38 * bass + 0.48 * kick + 0.30 * snare + 0.20 * hat + 0.32 * arp_R
+            L = 0.42 * pad_L + 0.38 * bass + 0.45 * kick + 0.28 * snare + 0.16 * hat + 0.30 * lead_L
+            R = 0.42 * pad_R + 0.38 * bass + 0.45 * kick + 0.28 * snare + 0.16 * hat + 0.30 * lead_R
         elif style == 'trap':
-            L = 0.25 * pad_L + 0.50 * bass + 0.35 * kick + 0.40 * snare + 0.22 * hat + 0.28 * arp_L
-            R = 0.25 * pad_R + 0.50 * bass + 0.35 * kick + 0.40 * snare + 0.22 * hat + 0.28 * arp_L
-        elif style == 'rock':
-            L = 0.45 * pad_L + 0.38 * bass + 0.40 * kick + 0.35 * snare + 0.20 * hat + 0.20 * arp_L
-            R = 0.45 * pad_R + 0.38 * bass + 0.40 * kick + 0.35 * snare + 0.20 * hat + 0.20 * arp_R
+            L = 0.30 * pad_L + 0.48 * bass + 0.35 * kick + 0.35 * snare + 0.18 * hat + 0.25 * lead_L
+            R = 0.30 * pad_R + 0.48 * bass + 0.35 * kick + 0.35 * snare + 0.18 * hat + 0.25 * lead_R
         elif style == 'piano':
-            L = 0.55 * pad_L + 0.25 * bass + 0.35 * arp_L
-            R = 0.55 * pad_R + 0.25 * bass + 0.35 * arp_R
+            L = 0.55 * pad_L + 0.25 * bass + 0.40 * lead_L
+            R = 0.55 * pad_R + 0.25 * bass + 0.40 * lead_R
         elif style == 'space':
-            L = 0.55 * pad_L + 0.35 * bass + 0.20 * kick + 0.12 * hat + 0.28 * arp_L
-            R = 0.55 * pad_R + 0.35 * bass + 0.20 * kick + 0.12 * hat + 0.28 * arp_R
+            L = 0.55 * pad_L + 0.32 * bass + 0.18 * kick + 0.10 * hat + 0.25 * lead_L
+            R = 0.55 * pad_R + 0.32 * bass + 0.18 * kick + 0.10 * hat + 0.25 * lead_R
         elif style == 'lofi':
-            L = 0.45 * pad_L + 0.35 * bass + 0.28 * kick + 0.22 * snare + 0.14 * hat + 0.22 * arp_L
-            R = 0.45 * pad_R + 0.35 * bass + 0.28 * kick + 0.22 * snare + 0.14 * hat + 0.22 * arp_R
-        elif style == 'epic':
-            L = 0.48 * pad_L + 0.40 * bass + 0.45 * kick + 0.22 * snare + 0.22 * arp_L
-            R = 0.48 * pad_R + 0.40 * bass + 0.45 * kick + 0.22 * snare + 0.22 * arp_R
+            L = 0.48 * pad_L + 0.32 * bass + 0.25 * kick + 0.20 * snare + 0.12 * hat + 0.25 * lead_L
+            R = 0.48 * pad_R + 0.32 * bass + 0.25 * kick + 0.20 * snare + 0.12 * hat + 0.25 * lead_R
         else:
-            L = 0.38 * pad_L + 0.35 * bass + 0.35 * kick + 0.28 * snare + 0.18 * hat + 0.28 * arp_L
-            R = 0.38 * pad_R + 0.35 * bass + 0.35 * kick + 0.28 * snare + 0.18 * hat + 0.28 * arp_R
+            L = 0.45 * pad_L + 0.32 * bass + 0.28 * kick + 0.20 * snare + 0.12 * hat + 0.35 * lead_L
+            R = 0.45 * pad_R + 0.32 * bass + 0.28 * kick + 0.20 * snare + 0.12 * hat + 0.35 * lead_R
 
-        L = np.tanh(L * 1.30)
-        R = np.tanh(R * 1.30)
+        # 8. BLACKMAN LOW-PASS FILTER (Zero Digital Harshness or Bips)
+        k = np.blackman(11); k /= k.sum()
+        L = np.convolve(L, k, mode='same')
+        R = np.convolve(R, k, mode='same')
 
-        fade_len = min(int(sample_rate * 0.25), len(t) // 4)
+        # 9. SMOOTH MASTER FADE-IN & FADE-OUT
+        fade_len = min(int(sample_rate * 0.2), len(t) // 4)
         if fade_len > 0:
             fade_in = np.linspace(0, 1, fade_len)
             fade_out = np.linspace(1, 0, fade_len)
             L[:fade_len] *= fade_in; L[-fade_len:] *= fade_out
             R[:fade_len] *= fade_in; R[-fade_len:] *= fade_out
+
+        # 10. HEADROOM NORMALIZATION
+        peak = max(float(np.max(np.abs(L))), float(np.max(np.abs(R))), 0.001)
+        L = (L / peak) * 0.88
+        R = (R / peak) * 0.88
 
         interleaved = np.empty((len(t) * 2,), dtype=np.int16)
         interleaved[0::2] = (np.clip(L, -0.98, 0.98) * 32767).astype(np.int16)

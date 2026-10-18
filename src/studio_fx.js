@@ -214,9 +214,38 @@
     }
 
     function checkFullscreen() {
-      var isFs = !!doc.querySelector('button[aria-label*="Close fullscreen"], button[title*="Exit fullscreen" i], button[title*="close fullscreen" i]');
+      var fsFrame = doc.querySelector('[data-testid="stFullScreenFrame"]');
+      var isFs = !!fsFrame || !!doc.querySelector('button[aria-label*="Close fullscreen"], button[title*="Exit fullscreen" i], button[title*="close fullscreen" i]');
       doc.body.classList.toggle('in-fullscreen', isFs);
       root.classList.toggle('in-fullscreen', isFs);
+
+      var existingExitBtn = doc.getElementById('studio-exit-fs-pill');
+      if (fsFrame || isFs) {
+        if (!existingExitBtn) {
+          var btn = doc.createElement('button');
+          btn.id = 'studio-exit-fs-pill';
+          btn.innerHTML = '✕ Minimize / Exit (Esc)';
+          btn.setAttribute('aria-label', 'Exit fullscreen mode');
+          btn.style.cssText = 'position:fixed !important; top:1.25rem !important; right:1.5rem !important; z-index:2147483647 !important; background:#ef4444 !important; color:#ffffff !important; border:2px solid #ffffff !important; border-radius:9999px !important; padding:0.55rem 1.35rem !important; font-weight:700 !important; font-size:0.95rem !important; cursor:pointer !important; box-shadow:0 4px 25px rgba(239, 68, 68, 0.85), 0 0 15px rgba(255, 255, 255, 0.5) !important; display:flex !important; align-items:center !important; font-family:sans-serif !important;';
+          btn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var nativeBtn = doc.querySelector('[data-testid="stFullScreenFrame"] button, button[aria-label*="Close fullscreen"], button[title*="Exit fullscreen" i], button[title*="close fullscreen" i]');
+            if (nativeBtn) {
+              nativeBtn.click();
+            } else {
+              var escEvt = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true });
+              doc.dispatchEvent(escEvt);
+            }
+            if (btn.parentNode) btn.parentNode.removeChild(btn);
+            doc.body.classList.remove('in-fullscreen');
+            root.classList.remove('in-fullscreen');
+          };
+          doc.body.appendChild(btn);
+        }
+      } else if (existingExitBtn) {
+        existingExitBtn.parentNode.removeChild(existingExitBtn);
+      }
     }
 
     /* ---------- Downward Chat Auto-Scroll (ChatGPT / Claude / Antigravity Pinning) ---------- */
@@ -541,6 +570,18 @@
         if (back.classList.contains('open')) { 
           close(); 
           return; 
+        }
+        var customPill = doc.getElementById('studio-exit-fs-pill');
+        if (customPill) {
+          e.preventDefault();
+          customPill.click();
+          return;
+        }
+        var dialogClose = doc.querySelector('div[role="dialog"] button[aria-label="Close"], [data-testid="stDialog"] button[aria-label="Close"]');
+        if (dialogClose) {
+          e.preventDefault();
+          dialogClose.click();
+          return;
         }
         var fsBtn = doc.querySelector('[data-testid="StyledFullScreenButton"], button[title*="exit fullscreen" i], button[title*="close fullscreen" i], [data-testid="stFullScreenFrame"] button');
         if (fsBtn) {

@@ -928,3 +928,64 @@ img[src*="avatar_assistant"] {
 
 
 
+
+
+/* =====================================================================
+   Fullscreen Frame, Minimize Button & Dialog Visibility Guarantees
+   ===================================================================== */
+[data-testid="stFullScreenFrame"] {
+  z-index: 2147483640 !important;
+  background: rgba(7, 8, 13, 0.98) !important;
+}
+
+.in-fullscreen header[data-testid="stHeader"],
+body:has([data-testid="stFullScreenFrame"]) header[data-testid="stHeader"] {
+  display: none !important;
+}
+
+[data-testid="stFullScreenFrame"] button,
+button[aria-label*="Close fullscreen" i],
+button[title*="Exit fullscreen" i],
+button[title*="Close fullscreen" i] {
+  position: fixed !important;
+  top: 1.25rem !important;
+  right: 1.5rem !important;
+  z-index: 2147483647 !important;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border: 2px solid #ffffff !important;
+  border-radius: 9999px !important;
+  padding: 0.55rem 1.35rem !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  box-shadow: 0 4px 25px rgba(239, 68, 68, 0.85), 0 0 15px rgba(255, 255, 255, 0.5) !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  transition: transform 0.15s ease, background 0.15s ease !important;
+}
+
+[data-testid="stFullScreenFrame"] button:hover,
+button[aria-label*="Close fullscreen" i]:hover,
+button[title*="Exit fullscreen" i]:hover {
+  background: #dc2626 !important;
+  transform: scale(1.05) !important;
+}
+
+div[role="dialog"] button[aria-label="Close"],
+[data-testid="stDialog"] button[aria-label="Close"] {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border: 1px solid rgba(239, 68, 68, 0.5) !important;
+  color: #fca5a5 !important;
+  border-radius: 8px !important;
+  padding: 4px 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+div[role="dialog"] button[aria-label="Close"]:hover,
+[data-testid="stDialog"] button[aria-label="Close"]:hover {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.6) !important;
+}
