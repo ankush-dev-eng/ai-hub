@@ -1168,10 +1168,21 @@ img[src*="avatar_assistant"] {
 }
 
 /* Floating Figma Bottom Chat Input Bar */
+[data-testid="stBottom"] {
+  background: transparent !important;
+  pointer-events: none !important;
+}
+
+[data-testid="stBottom"] > * {
+  pointer-events: auto !important;
+}
+
 [data-testid="stChatInput"] {
+  max-width: 960px !important;
+  margin: 0 auto !important;
   border-radius: 18px !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  background: rgba(12, 14, 22, 0.92) !important;
+  background: rgba(12, 14, 22, 0.95) !important;
   backdrop-filter: blur(18px) !important;
   -webkit-backdrop-filter: blur(18px) !important;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
