@@ -20,3 +20,4 @@ venv/
 data/sessions/
 *.log
 .system_generated/
+.colab_tunnel_cache.txt

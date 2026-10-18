@@ -1123,45 +1123,232 @@ def check_colab_health(colab_url: str) -> tuple[bool, str, str]:
     except Exception as e:
         return False, str(e), ""
 
-def generate_cinematic_soundtrack(prompt: str, duration_sec: float = 4.0, sample_rate: int = 44100) -> bytes:
-    """Synthesizes rich atmospheric procedural soundscapes matching visual prompt keywords."""
-    import numpy as np, wave, io
-    t = np.linspace(0, duration_sec, int(sample_rate * duration_sec), endpoint=False)
-    p_lower = prompt.lower()
-    
-    if any(k in p_lower for k in ['cyber', 'neon', 'synth', 'future', 'robot']):
-        bass = 0.35 * np.sin(2 * np.pi * 65.41 * t)
-        lead = 0.20 * np.sin(2 * np.pi * 130.81 * t) + 0.15 * np.sin(2 * np.pi * 196.00 * t)
-        pulse = 0.5 * (1.0 + np.sin(2 * np.pi * 4.0 * t))
-        audio = (bass + lead * pulse)
-    elif any(k in p_lower for k in ['car', 'speed', 'action', 'race', 'flight', 'drone', 'fly']):
-        freq_ramp = np.linspace(60, 240, len(t))
-        drone = 0.35 * np.sin(2 * np.pi * freq_ramp * t)
-        sub = 0.25 * np.sin(2 * np.pi * 45 * t)
-        audio = drone + sub
-    elif any(k in p_lower for k in ['space', 'cosmic', 'galaxy', 'ambient', 'stars', 'deep']):
-        sub = 0.40 * np.sin(2 * np.pi * 40 * t)
-        shimmer = 0.15 * np.sin(2 * np.pi * (528 + 25 * np.sin(2 * np.pi * 0.2 * t)) * t)
-        audio = sub + shimmer
-    else:
-        bass = 0.35 * np.sin(2 * np.pi * 55 * t)
-        chord = 0.20 * np.sin(2 * np.pi * 110 * t) + 0.15 * np.sin(2 * np.pi * 164.81 * t)
-        audio = bass + chord
+AUDIO_PRESETS = {
+    "🌌 Cyberpunk Neon City (Synthwave Bassline & 80s Arp)": "Cyberpunk Neon City synthwave retro 80s driving bassline punchy electronic beats",
+    "🚀 Deep Space Nebula (Cosmic Sub-Bass & Ambient Pad)": "Deep Space Nebula cosmic atmospheric ambient pads sub-bass ethereal stargazing",
+    "🏎️ High-Speed Racing & Action (Breakbeat & Engine Rumble)": "High-speed racing action cinematic punchy drums engine rumble fast rhythm",
+    "🌧️ Ambient Lo-Fi Chill (Warm Rhodes & Vinyl Rain)": "Lo-fi chill warm rhodes chords mellow acoustic rain beat relaxing vinyl texture",
+    "⚔️ Epic Orchestral Tension (Timpani & Cinematic Strings)": "Epic orchestral tension heavy cinematic brass timpani drums suspenseful strings",
+    "✏️ Custom Atmospheric Sound Prompt": ""
+}
 
-    env = np.ones_like(t)
-    fade = min(int(sample_rate * 0.6), len(t) // 3)
-    if fade > 0:
-        env[:fade] = np.linspace(0, 1, fade)
-        env[-fade:] = np.linspace(1, 0, fade)
-    audio = np.clip(audio * env, -0.95, 0.95)
-    int_audio = (audio * 32767).astype(np.int16)
+def on_aud_preset_change():
+    preset_chosen = st.session_state.get("tab3_aud_preset", "")
+    if preset_chosen in AUDIO_PRESETS:
+        if preset_chosen != "✏️ Custom Atmospheric Sound Prompt":
+            st.session_state["tab3_aud_prompt"] = AUDIO_PRESETS[preset_chosen]
+        else:
+            if st.session_state.get("tab3_aud_prompt", "") in AUDIO_PRESETS.values():
+                st.session_state["tab3_aud_prompt"] = ""
+
+def generate_cinematic_soundtrack(prompt: str, duration_sec: float = 4.0, sample_rate: int = 44100) -> bytes:
+    """Synthesizes studio-grade polyphonic stereo cinematic music & atmospheric soundscapes matching prompt keywords."""
+    import numpy as np, wave, io
+    dur = max(1.0, float(duration_sec))
+    t = np.linspace(0, dur, int(sample_rate * dur), endpoint=False)
+    p = prompt.lower()
+
+    if any(k in p for k in ['space', 'cosmic', 'galaxy', 'ambient', 'stars', 'deep', 'nebula']):
+        bpm = 65.0
+        style = 'space'
+        chords = [
+            [146.83, 220.00, 261.63, 329.63, 440.00],  # Dm9
+            [116.54, 174.61, 233.08, 293.66, 349.23],  # Bbmaj7
+            [174.61, 261.63, 329.63, 392.00, 523.25],  # Fmaj7
+            [130.81, 196.00, 246.94, 293.66, 392.00]   # Cadd9
+        ]
+    elif any(k in p for k in ['action', 'speed', 'car', 'race', 'rush', 'fast', 'drive', 'flight', 'drone']):
+        bpm = 135.0
+        style = 'action'
+        chords = [
+            [82.41, 123.47, 164.81, 196.00],  # Em
+            [110.00, 164.81, 220.00, 261.63], # Am
+            [98.00, 146.83, 196.00, 246.94],  # G
+            [123.47, 185.00, 246.94, 293.66]  # Bm
+        ]
+    elif any(k in p for k in ['chill', 'lofi', 'lo-fi', 'relax', 'rain', 'mellow', 'warm', 'rhodes']):
+        bpm = 80.0
+        style = 'lofi'
+        chords = [
+            [130.81, 164.81, 196.00, 246.94, 293.66], # Cmaj9
+            [110.00, 164.81, 220.00, 261.63, 329.63], # Am9
+            [146.83, 174.61, 220.00, 261.63, 349.23], # Dm9
+            [98.00, 146.83, 196.00, 246.94, 293.66]   # G9
+        ]
+    elif any(k in p for k in ['epic', 'orchestral', 'tension', 'cinematic', 'brass', 'strings', 'timpani', 'battle', 'movie']):
+        bpm = 96.0
+        style = 'epic'
+        chords = [
+            [65.41, 130.81, 196.00, 261.63, 311.13], # Cm
+            [51.91, 103.83, 155.56, 207.65, 261.63], # Ab
+            [43.65, 87.31, 130.81, 174.61, 207.65],  # Fm
+            [49.00, 98.00, 146.83, 196.00, 246.94]   # G
+        ]
+    else:  # Cyberpunk Synthwave
+        bpm = 116.0
+        style = 'cyber'
+        chords = [
+            [146.83, 220.00, 261.63, 349.23], # Dm
+            [116.54, 174.61, 233.08, 293.66], # Bb
+            [174.61, 261.63, 349.23, 440.00], # F
+            [130.81, 196.00, 261.63, 329.63]  # C
+        ]
+
+    beat_dur = 60.0 / bpm
+    bar_dur = beat_dur * 4.0
+    chord_idx = (np.floor(t / bar_dur).astype(int)) % len(chords)
+    t_beat = t % beat_dur
+    beat_num = np.floor(t / beat_dur).astype(int) % 4
+
+    # Seed noise deterministically for prompt consistency
+    np.random.seed(int(abs(hash(prompt))) % 100000)
+    white_noise = np.random.uniform(-1.0, 1.0, len(t))
+
+    # 1. KICK DRUM / LOW IMPACT
+    tau_k = t_beat
+    k_env = np.exp(-18.0 * tau_k)
+    k_phase = 2.0 * np.pi * (45.0 * tau_k - (120.0 / 35.0) * (np.exp(-35.0 * tau_k) - 1.0))
+    k_pulse = np.sin(k_phase) * k_env
+
+    if style in ['cyber', 'action']:
+        kick = k_pulse  # 4-on-the-floor
+    elif style == 'lofi':
+        k_mask = (beat_num == 0) | ((beat_num == 2) & (t_beat > beat_dur * 0.4))
+        kick = k_pulse * k_mask * 0.9
+    elif style == 'epic':
+        timp_env = np.exp(-8.0 * tau_k)
+        timp_phase = 2.0 * np.pi * (38.0 * tau_k - (90.0 / 15.0) * (np.exp(-15.0 * tau_k) - 1.0))
+        kick = np.sin(timp_phase) * timp_env * ((beat_num == 0) | (beat_num == 2)) * 1.4
+    else:  # space
+        kick = k_pulse * (beat_num == 0) * (np.floor(t / bar_dur).astype(int) % 2 == 0) * 0.5
+
+    # 2. SNARE / CLAP
+    snare_mask = (beat_num == 1) | (beat_num == 3)
+    tau_s = t_beat
+    s_tone = np.sin(2.0 * np.pi * 185.0 * tau_s) * np.exp(-28.0 * tau_s) * snare_mask
+    s_noise = white_noise * np.exp(-20.0 * tau_s) * snare_mask
+    if style in ['cyber', 'action']:
+        snare = 0.5 * s_tone + 0.5 * s_noise
+    elif style == 'lofi':
+        snare = (0.3 * s_tone + 0.3 * s_noise) * 0.7
+    elif style == 'epic':
+        snare = white_noise * np.exp(-14.0 * tau_s) * (beat_num == 2) * 0.4
+    else:
+        snare = np.zeros_like(t)
+
+    # 3. HI-HATS / ATMOSPHERIC NOISE
+    if style == 'cyber':
+        t_16 = t % (beat_dur / 4.0)
+        h_env = np.exp(-60.0 * t_16)
+        hat = white_noise * h_env * 0.16
+    elif style == 'action':
+        t_8 = t % (beat_dur / 2.0)
+        h_env = np.exp(-45.0 * t_8)
+        hat = white_noise * h_env * 0.22
+    elif style == 'lofi':
+        t_8 = t % (beat_dur / 2.0)
+        hat = white_noise * 0.02 + white_noise * np.exp(-55.0 * t_8) * 0.08
+    elif style == 'space':
+        swell = 0.5 * (1.0 + np.sin(2.0 * np.pi * 0.25 * t))
+        hat = white_noise * 0.035 * swell
+    else:  # epic
+        hat = np.zeros_like(t)
+
+    # 4. CHORD PADS (Lush detuned stereo polysynth)
+    pad_L = np.zeros_like(t)
+    pad_R = np.zeros_like(t)
+    lfo_filter = 0.75 + 0.25 * np.sin(2.0 * np.pi * 0.3 * t)
+
+    for c_i, c_notes in enumerate(chords):
+        mask = (chord_idx == c_i)
+        if not np.any(mask):
+            continue
+        t_sub = t[mask]
+        norm = 0.45 / len(c_notes)
+        for note_f in c_notes:
+            v_l = 0.5 * np.sin(2 * np.pi * note_f * t_sub) + 0.35 * np.sin(2 * np.pi * (note_f * 1.004) * t_sub) + 0.15 * np.sin(4 * np.pi * note_f * t_sub)
+            v_r = 0.5 * np.sin(2 * np.pi * note_f * t_sub) + 0.35 * np.sin(2 * np.pi * (note_f * 0.996) * t_sub) + 0.15 * np.sin(4 * np.pi * (note_f * 1.003) * t_sub)
+            pad_L[mask] += v_l * norm * lfo_filter[mask]
+            pad_R[mask] += v_r * norm * lfo_filter[mask]
+
+    # 5. BASSLINE
+    bass = np.zeros_like(t)
+    if style == 'cyber':
+        t_bass = t % (beat_dur / 4.0)
+        b_env = np.exp(-12.0 * t_bass)
+    elif style == 'action':
+        t_bass = t % (beat_dur / 2.0)
+        b_env = np.exp(-9.0 * t_bass)
+    elif style == 'epic':
+        t_bass = t % (beat_dur / 2.0)
+        b_env = np.exp(-6.0 * t_bass)
+    else:
+        t_bass = t % beat_dur
+        b_env = np.exp(-4.0 * t_bass)
+
+    for c_i, c_notes in enumerate(chords):
+        mask = (chord_idx == c_i)
+        if not np.any(mask):
+            continue
+        root_f = c_notes[0] * 0.5
+        t_sub = t[mask]
+        bass[mask] = (0.7 * np.sin(2 * np.pi * root_f * t_sub) + 0.3 * np.sin(4 * np.pi * root_f * t_sub)) * b_env[mask]
+
+    # 6. ARPEGGIO / MELODY (Ping-Pong Stereo)
+    arp_L = np.zeros_like(t)
+    arp_R = np.zeros_like(t)
+    t_arp = t % (beat_dur / 4.0)
+    arp_step = np.floor(t / (beat_dur / 4.0)).astype(int) % 4
+    a_env = np.exp(-16.0 * t_arp)
+    for c_i, c_notes in enumerate(chords):
+        mask = (chord_idx == c_i)
+        if not np.any(mask):
+            continue
+        t_sub = t[mask]
+        step_sub = arp_step[mask]
+        arp_freqs = np.array([c_notes[s % len(c_notes)] * 2.0 for s in step_sub])
+        tone = (np.sin(2 * np.pi * arp_freqs * t_sub) + 0.25 * np.sin(4 * np.pi * arp_freqs * t_sub)) * a_env[mask]
+        is_even = (step_sub % 2 == 0)
+        arp_L[mask] += tone * (np.where(is_even, 0.8, 0.2) * 0.25)
+        arp_R[mask] += tone * (np.where(is_even, 0.2, 0.8) * 0.25)
+
+    # Master stereo summing
+    if style == 'space':
+        L = 0.50 * pad_L + 0.35 * bass + 0.25 * kick + 0.15 * hat + 0.30 * arp_L
+        R = 0.50 * pad_R + 0.35 * bass + 0.25 * kick + 0.15 * hat + 0.30 * arp_R
+    elif style == 'epic':
+        L = 0.45 * pad_L + 0.40 * bass + 0.45 * kick + 0.20 * snare + 0.15 * arp_L
+        R = 0.45 * pad_R + 0.40 * bass + 0.45 * kick + 0.20 * snare + 0.15 * arp_R
+    elif style == 'lofi':
+        L = 0.45 * pad_L + 0.35 * bass + 0.25 * kick + 0.22 * snare + 0.12 * hat + 0.18 * arp_L
+        R = 0.45 * pad_R + 0.35 * bass + 0.25 * kick + 0.22 * snare + 0.12 * hat + 0.18 * arp_R
+    else:  # cyber / action
+        L = 0.38 * pad_L + 0.32 * bass + 0.30 * kick + 0.25 * snare + 0.16 * hat + 0.24 * arp_L
+        R = 0.38 * pad_R + 0.32 * bass + 0.30 * kick + 0.25 * snare - 0.16 * hat + 0.24 * arp_R
+
+    # Analog warmth saturation & master limiter
+    L = np.tanh(L * 1.35)
+    R = np.tanh(R * 1.35)
+
+    # Smooth master fade-in & fade-out
+    fade_len = min(int(sample_rate * 0.35), len(t) // 4)
+    if fade_len > 0:
+        fade_in = np.linspace(0, 1, fade_len)
+        fade_out = np.linspace(1, 0, fade_len)
+        L[:fade_len] *= fade_in; L[-fade_len:] *= fade_out
+        R[:fade_len] *= fade_in; R[-fade_len:] *= fade_out
+
+    # 16-bit interleaved stereo WAV (44.1 kHz)
+    interleaved = np.empty((len(t) * 2,), dtype=np.int16)
+    interleaved[0::2] = (np.clip(L, -0.98, 0.98) * 32767).astype(np.int16)
+    interleaved[1::2] = (np.clip(R, -0.98, 0.98) * 32767).astype(np.int16)
 
     buf = io.BytesIO()
     with wave.open(buf, 'wb') as wf:
-        wf.setnchannels(1)
+        wf.setnchannels(2)
         wf.setsampwidth(2)
         wf.setframerate(sample_rate)
-        wf.writeframes(int_audio.tobytes())
+        wf.writeframes(interleaved.tobytes())
     return buf.getvalue()
 
 def mux_video_and_audio(vid_bytes: bytes, aud_bytes: bytes) -> bytes:
@@ -1743,6 +1930,10 @@ if "tab3_audio_bytes" not in st.session_state:
     st.session_state.tab3_audio_bytes = None
 if "tab3_audio_caption" not in st.session_state:
     st.session_state.tab3_audio_caption = None
+if "tab3_aud_preset" not in st.session_state:
+    st.session_state.tab3_aud_preset = list(AUDIO_PRESETS.keys())[0]
+if "tab3_aud_prompt" not in st.session_state:
+    st.session_state.tab3_aud_prompt = AUDIO_PRESETS[list(AUDIO_PRESETS.keys())[0]]
 
 # Auto-probe connection on first load
 if "colab_auto_probed" not in st.session_state:
@@ -3078,19 +3269,12 @@ with tab3:
         with c_aud_p:
             aud_preset = st.selectbox(
                 "Audio Atmosphere & Preset:",
-                [
-                    "🌌 Cyberpunk Neon City (Synthwave Bassline & 80s Resonator)",
-                    "🚀 Deep Space Nebula (Sub-Bass Drone & Ethereal Shimmer)",
-                    "🏎️ High-Speed Racing & Action (Engine Pulse & Cinematic Riser)",
-                    "🌧️ Ambient Lo-Fi Chill (Warm Chord & Atmospheric Rain)",
-                    "⚔️ Epic Orchestral Tension (Bass Drone & Fifth Riser)",
-                    "✏️ Custom Atmospheric Sound Prompt"
-                ],
-                key="tab3_aud_preset"
+                options=list(AUDIO_PRESETS.keys()),
+                key="tab3_aud_preset",
+                on_change=on_aud_preset_change
             )
             aud_prompt_val = st.text_input(
                 "Audio Prompt / Description:",
-                value=aud_preset.split("(")[0].strip() if "(" in aud_preset else aud_preset,
                 key="tab3_aud_prompt"
             )
         with c_aud_ctrl:
