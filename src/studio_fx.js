@@ -219,6 +219,71 @@
       root.classList.toggle('in-fullscreen', isFs);
     }
 
+    /* ---------- Downward Chat Auto-Scroll (ChatGPT / Claude / Antigravity Pinning) ---------- */
+    function getScroller() {
+      var candidates = [
+        doc.querySelector('section.main'),
+        doc.querySelector('.stMain'),
+        doc.querySelector('[data-testid="stAppViewContainer"]'),
+        doc.scrollingElement,
+        doc.documentElement,
+        doc.body
+      ];
+      for (var i = 0; i < candidates.length; i++) {
+        var el = candidates[i];
+        if (el && el.scrollHeight > el.clientHeight + 20) {
+          return el;
+        }
+      }
+      return doc.documentElement || doc.body;
+    }
+
+    function isNearBottom(scroller) {
+      if (!scroller) return true;
+      var diff = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+      return diff < 340;
+    }
+
+    function autoScrollChat(force) {
+      var msgs = doc.querySelectorAll('[data-testid="stChatMessage"]');
+      if (msgs.length === 0) return;
+      var currentTab = root.getAttribute('data-tab');
+      if (currentTab !== null && currentTab !== '0' && !force) return;
+
+      var scroller = getScroller();
+      if (force || isNearBottom(scroller)) {
+        var anchor = doc.getElementById('chat-bottom-anchor');
+        if (anchor) {
+          anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } else if (msgs.length > 0) {
+          msgs[msgs.length - 1].scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+        if (scroller && (force || isNearBottom(scroller))) {
+          scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+        }
+      }
+    }
+
+    host.addEventListener('aihub:scrollchat', function () {
+      autoScrollChat(true);
+      host.setTimeout(function () { autoScrollChat(true); }, 80);
+      host.setTimeout(function () { autoScrollChat(true); }, 250);
+    });
+
+    on(doc, 'keydown', function(e) {
+      if (e.key === 'Enter' && e.target && e.target.closest('[data-testid="stChatInput"]')) {
+        host.setTimeout(function() { autoScrollChat(true); }, 100);
+        host.setTimeout(function() { autoScrollChat(true); }, 350);
+      }
+    });
+
+    on(doc, 'click', function(e) {
+      if (e.target && e.target.closest('[data-testid="stChatInput"] button')) {
+        host.setTimeout(function() { autoScrollChat(true); }, 100);
+        host.setTimeout(function() { autoScrollChat(true); }, 350);
+      }
+    });
+
     var queued = false;
     function refresh() { 
       queued = false; 
@@ -226,12 +291,20 @@
       syncTab(); 
       startHero(); 
       checkFullscreen();
+      autoScrollChat(false);
     }
 
-    var mo = new host.MutationObserver(function () {
+    var mo = new host.MutationObserver(function (mutations) {
       if (!queued) { queued = true; host.requestAnimationFrame(refresh); }
+      for (var i = 0; i < mutations.length; i++) {
+        var target = mutations[i].target;
+        if (target && target.nodeType === 1 && target.closest && target.closest('[data-testid="stChatMessage"]')) {
+          autoScrollChat(false);
+          break;
+        }
+      }
     });
-    mo.observe(doc.body, { childList: true, subtree: true });
+    mo.observe(doc.body, { childList: true, subtree: true, characterData: true });
     
     var mo2 = new host.MutationObserver(function () { syncTab(); });
     mo2.observe(doc.body, { attributes: true, attributeFilter: ['aria-selected'], subtree: true });

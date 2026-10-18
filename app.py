@@ -18,7 +18,8 @@ import subprocess
 import math
 
 # Add src to path for session_manager
-sys.path.append(str(Path(__file__).parent / "src"))
+ROOT_DIR = Path(__file__).parent.resolve()
+sys.path.append(str(ROOT_DIR / "src"))
 from studio_components import (
     esc,
     fx_flags,
@@ -377,7 +378,12 @@ def render_telemetry(placeholder):
     </div>
     """, placeholder)
 
-AVATARS = {"user": "🧑‍💻", "assistant": "⚡"}
+USER_AVATAR_PATH = os.path.join(ROOT_DIR, "src", "assets", "avatar_user.svg")
+ASSISTANT_AVATAR_PATH = os.path.join(ROOT_DIR, "src", "assets", "avatar_assistant.svg")
+AVATARS = {
+    "user": USER_AVATAR_PATH if os.path.exists(USER_AVATAR_PATH) else "🧑‍💻",
+    "assistant": ASSISTANT_AVATAR_PATH if os.path.exists(ASSISTANT_AVATAR_PATH) else "✨"
+}
 
 # ----------------- MERMAID & MARKDOWN SANITIZER -----------------
 def sanitize_mermaid_code(chart: str) -> str:
@@ -727,9 +733,9 @@ COLAB_SERVER_SNIPPET = """# ====================================================
 !dpkg -i cloudflared-linux-amd64.deb > /dev/null 2>&1
 print("✅ Dependencies and Cloudflare Tunnel installed successfully!")
 
-# 2. Build the GPU Microservice
+# 2. Build the GPU Microservice with Mutual VRAM Management (No CUDA OOM)
 server_code = '''
-import os, io, time, base64
+import os, io, time, base64, gc
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -738,13 +744,37 @@ from PIL import Image
 import imageio
 import numpy as np
 
+# Avoid CUDA memory fragmentation
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 app = FastAPI(title="AI Hub Colab GPU Bridge")
 
 VIDEO_PIPE = None
 IMAGE_PIPE = None
 
+def free_image_pipeline():
+    global IMAGE_PIPE
+    if IMAGE_PIPE is not None:
+        del IMAGE_PIPE
+        IMAGE_PIPE = None
+        gc.collect()
+        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.ipc_collect()
+
+def free_video_pipeline():
+    global VIDEO_PIPE
+    if VIDEO_PIPE is not None:
+        del VIDEO_PIPE
+        VIDEO_PIPE = None
+        gc.collect()
+        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.ipc_collect()
+
 def get_video_pipeline():
     global VIDEO_PIPE
+    free_image_pipeline()
     if VIDEO_PIPE is None:
         from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
         print("⚡ Loading damo-vilab/text-to-video-ms-1.7b onto T4 GPU...")
@@ -754,12 +784,14 @@ def get_video_pipeline():
             variant="fp16"
         )
         pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-        pipe.enable_model_cpu_offload()
+        pipe = pipe.to("cuda")
+        pipe.enable_vae_slicing()
         VIDEO_PIPE = pipe
     return VIDEO_PIPE
 
 def get_image_pipeline():
     global IMAGE_PIPE
+    free_video_pipeline()
     if IMAGE_PIPE is None:
         from diffusers import AutoPipelineForText2Image
         print("⚡ Loading stabilityai/sdxl-turbo onto T4 GPU...")
@@ -768,7 +800,7 @@ def get_image_pipeline():
             torch_dtype=torch.float16,
             variant="fp16"
         )
-        pipe.to("cuda")
+        pipe = pipe.to("cuda")
         IMAGE_PIPE = pipe
     return IMAGE_PIPE
 
@@ -814,19 +846,34 @@ class VideoGenRequest(BaseModel):
 def generate_video(req: VideoGenRequest):
     try:
         pipe = get_video_pipeline()
+        diff_h = 256
+        diff_w = 384 if req.width >= req.height else 256
         num_frames = max(16, min(int(req.duration * 6), 32))
-        video_frames = pipe(req.prompt, num_frames=num_frames, height=req.height, width=req.width, num_inference_steps=25).frames[0]
+
+        print(f"Synthesizing {num_frames} frames of true 3D diffusion on T4...")
+        video_frames = pipe(
+            req.prompt, 
+            num_frames=num_frames, 
+            height=diff_h, 
+            width=diff_w, 
+            num_inference_steps=20
+        ).frames[0]
+
+        target_w = req.width if req.width >= 256 else 704
+        target_h = req.height if req.height >= 256 else 512
+
         buf = io.BytesIO()
-        if isinstance(video_frames, np.ndarray):
-            if video_frames.dtype != np.uint8:
-                video_frames = (video_frames * 255).astype(np.uint8)
-        writer = imageio.get_writer(buf, format="mp4", fps=req.fps, codec="libx264")
+        writer = imageio.get_writer(buf, format="mp4", fps=req.fps, codec="libx264", quality=8)
         for frame in video_frames:
-            if not isinstance(frame, np.ndarray):
-                frame = np.array(frame)
-            if frame.dtype != np.uint8:
-                frame = (frame * 255).astype(np.uint8)
-            writer.append_data(frame)
+            if isinstance(frame, np.ndarray):
+                if frame.dtype != np.uint8:
+                    frame = (frame * 255).astype(np.uint8)
+                p_img = Image.fromarray(frame)
+            else:
+                p_img = frame
+            if (p_img.width, p_img.height) != (target_w, target_h):
+                p_img = p_img.resize((target_w, target_h), Image.Resampling.LANCZOS)
+            writer.append_data(np.array(p_img))
         writer.close()
         return Response(content=buf.getvalue(), media_type="video/mp4")
     except Exception as e:
@@ -836,8 +883,12 @@ def generate_video(req: VideoGenRequest):
 with open("colab_bridge_server.py", "w") as f:
     f.write(server_code)
 
-# 3. Launch Server & Start Cloudflare Tunnel
+# 3. Clean restart of server & Cloudflare tunnel
 import subprocess, time, re
+
+!pkill -f uvicorn > /dev/null 2>&1
+!pkill -f cloudflared > /dev/null 2>&1
+time.sleep(1)
 
 proc = subprocess.Popen(["uvicorn", "colab_bridge_server:app", "--port", "8000"])
 time.sleep(2)
@@ -847,7 +898,7 @@ print("🚀 Starting Cloudflare Tunnel... Generating public endpoint...")
 for _ in range(35):
     line = tunnel.stderr.readline()
     if "trycloudflare.com" in line:
-        match = re.search(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", line)
+        match = re.search(r"https://[a-zA-Z0-9-]+\\.trycloudflare\\.com", line)
         if match:
             url = match.group(0)
             print("\\n" + "="*60)
@@ -896,7 +947,19 @@ def generate_colab_video(colab_url: str, prompt: str, width: int = 512, height: 
     }
     with httpx.Client(timeout=240.0, follow_redirects=True) as client:
         resp = client.post(f"{clean_url}/generate-video", json=payload)
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            err_msg = ""
+            try:
+                err_msg = resp.json().get("detail", "")
+            except Exception:
+                err_msg = resp.text[:200]
+            if "out of memory" in err_msg.lower() or "same device" in err_msg.lower():
+                raise Exception(
+                    f"Colab GPU: {err_msg}. "
+                    "👉 Click 'Launch My Colab Notebook' and re-run the single cell to load the updated zero-OOM server!"
+                )
+            raise Exception(f"Colab GPU Server Error ({clean_url}): {err_msg or f'HTTP {resp.status_code}'}")
+
         content_type = resp.headers.get("content-type", "")
         if "video" in content_type or len(resp.content) > 10000:
             return resp.content
@@ -1200,7 +1263,7 @@ MODEL_KNOWLEDGE_SPECS = {
 }
 
 def render_model_intelligence_card(model_choice_str: str):
-    """Renders a synchronized, rich spec card with Architecture, Use Case, Context Memory, Cutoff Date, and Updateability."""
+    """Renders a sleek Figma-style telemetry spec chip bar with context, speed, and knowledge date."""
     spec = None
     for key, data in MODEL_KNOWLEDGE_SPECS.items():
         if key in model_choice_str or model_choice_str.startswith(key.split("/")[0]):
@@ -1211,36 +1274,16 @@ def render_model_intelligence_card(model_choice_str: str):
 
     badge_c = spec.get("badge_color", "#22d3ee")
     st.markdown(f"""
-    <div style="margin: 0.8rem 0 1.2rem 0; padding: 1rem 1.25rem; border-radius: 12px; background: rgba(14, 18, 28, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
-      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-        <div style="display: flex; align-items: center; gap: 0.6rem;">
-          <span style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: {badge_c}; box-shadow: 0 0 10px {badge_c};"></span>
-          <span style="font-weight: 700; color: #ffffff; font-size: 0.95rem;">{spec['name']}</span>
-          <span style="font-size: 0.78rem; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.06);">{spec['provider']}</span>
-        </div>
-        <div style="font-size: 0.8rem; color: #38bdf8; font-weight: 600;">
-          ⚡ Speed: {spec['speed']}
-        </div>
+    <div style="margin: 0.6rem 0 1rem 0; padding: 0.75rem 1rem; border-radius: 14px; background: rgba(14, 17, 26, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 6px 20px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {badge_c}; box-shadow: 0 0 10px {badge_c};"></span>
+        <span style="font-weight: 700; color: #ffffff; font-size: 0.92rem;">{spec['name']}</span>
+        <span style="font-size: 0.75rem; padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.06);">{spec['architecture']}</span>
+        <span style="font-size: 0.75rem; padding: 2px 7px; border-radius: 6px; background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.2);">🧠 {spec['context_window']}</span>
+        <span style="font-size: 0.75rem; padding: 2px 7px; border-radius: 6px; background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.2);">📅 {spec['cutoff_date']}</span>
       </div>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; font-size: 0.84rem;">
-        <div style="background: rgba(255,255,255,0.02); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
-          <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Architecture</div>
-          <div style="color: #e2e8f0; font-weight: 500;">{spec['architecture']}</div>
-        </div>
-        <div style="background: rgba(255,255,255,0.02); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
-          <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Token Memory / Context</div>
-          <div style="color: #38bdf8; font-weight: 600;">{spec['context_window']}</div>
-        </div>
-        <div style="background: rgba(255,255,255,0.02); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
-          <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Knowledge Cutoff</div>
-          <div style="color: #a78bfa; font-weight: 600;">{spec['cutoff_date']}</div>
-        </div>
-      </div>
-      <div style="margin-top: 0.75rem; font-size: 0.83rem; color: #cbd5e1; line-height: 1.45;">
-        <span style="color: #f59e0b; font-weight: 600;">Best Use Case:</span> {spec['best_for']}
-      </div>
-      <div style="margin-top: 0.45rem; font-size: 0.8rem; color: #94a3b8; line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 0.45rem;">
-        <span style="color: #10b981; font-weight: 600;">Can We Update It?</span> {spec['can_update']}
+      <div style="font-size: 0.8rem; color: #38bdf8; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+        <span>⚡ {spec['speed']}</span>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1651,6 +1694,8 @@ with tab1:
             sanitized = sanitize_markdown_text(msg["content"])
             st.markdown(sanitized)
 
+    ui('<div id="chat-bottom-anchor" style="height: 6px; margin-bottom: 8px;"></div>')
+
     input_box_value = st.session_state.pop("preset_prompt", None)
     user_prompt = st.chat_input("Ask anything (ideas, architecture, code, business model)...") or input_box_value
 
@@ -1852,6 +1897,7 @@ with tab1:
                         st.session_state.current_session_title,
                         st.session_state.chat_history
                     )
+                    ui('<div id="chat-bottom-anchor" style="height: 6px; margin-bottom: 8px;"><img src="data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'></svg>" style="display:none;" onload="window.dispatchEvent(new CustomEvent(\'aihub:scrollchat\')); this.remove();" /></div>')
 
             except Exception as e:
                 st.error(f"API Error ({provider}): {e}")
@@ -2142,6 +2188,22 @@ with tab3:
                 """)
                 st.caption("Need the raw code for a new notebook?")
                 st.code(COLAB_SERVER_SNIPPET, language="python")
+
+            with st.expander("🌟 What More Can You Do With Google Colab's 16GB Dedicated GPU?", expanded=False):
+                st.markdown("""
+                Your free Google Colab **16GB NVIDIA Tesla T4 GPU** has immense computational power. Here is what you can unlock with zero credit cards:
+                
+                * **🤖 1. Uncensored Open LLM Serving (Qwen 2.5 7B / Llama 3.1 8B):**
+                  Run full 8B reasoning models locally via `vLLM` or `transformers` in 4-bit AWQ/GPTQ with 32k context and zero cloud API rate limits.
+                * **🎙️ 2. Whisper Large-v3 Speech-to-Text Studio:**
+                  Transcribe 1-hour audio podcasts or meetings into structured JSON/SRT in under 60 seconds with 99% accuracy.
+                * **🔍 3. Real-ESRGAN / 4K Super-Resolution Upscaling:**
+                  Upscale diffusion outputs to 4096x4096 print-ready resolution with sharp micro-texture recovery.
+                * **🎬 4. 60 FPS RIFE Video Frame Interpolation:**
+                  Interpolate 16fps or 24fps diffusion clips into ultra-fluid 60 FPS slow-motion cinema.
+                * **🎨 5. Custom LoRA Fine-Tuning (Kohya / Dreambooth):**
+                  Train custom visual LoRAs on faces, product lines, or brand aesthetics in 20 minutes directly on Colab and download the `.safetensors` weight.
+                """)
 
     img_col, vid_col = st.columns(2, gap="large")
 

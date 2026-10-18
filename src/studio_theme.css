@@ -1103,4 +1103,91 @@ div[data-testid="stRadio"]:has(input[name*="tab3_hw_engine_selector"]) label:hov
   background: rgba(34, 211, 238, 0.08) !important;
 }
 
+/* ---------- GetLayers X Figma Chat Styling & Downward Fix ---------- */
+[data-testid="stChatMessage"] {
+  padding: 1.15rem 1.4rem !important;
+  border-radius: 18px !important;
+  margin-bottom: 1.1rem !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* User Message: Sleek deep-ink with indigo highlight */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]),
+[data-testid="stChatMessage"]:has(img[src*="avatar_user"]) {
+  background: linear-gradient(135deg, rgba(24, 30, 52, 0.8), rgba(14, 18, 32, 0.9)) !important;
+  border: 1px solid rgba(99, 102, 241, 0.32) !important;
+  box-shadow: 0 10px 28px -10px rgba(99, 102, 241, 0.25) !important;
+}
+
+/* Assistant Message: Obsidian glass panel */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]),
+[data-testid="stChatMessage"]:has(img[src*="avatar_assistant"]) {
+  background: linear-gradient(135deg, rgba(14, 17, 26, 0.85), rgba(8, 10, 18, 0.95)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.85) !important;
+}
+
+/* Figma-style rounded avatar frames */
+[data-testid="stChatMessageAvatar"],
+[data-testid="stChatMessage"] > div:first-child {
+  border-radius: 12px !important;
+  width: 38px !important;
+  height: 38px !important;
+  overflow: hidden !important;
+  background: rgba(12, 15, 24, 0.95) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+[data-testid="stChatMessageAvatar"] img,
+[data-testid="stChatMessage"] img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Floating Figma Bottom Chat Input Bar */
+[data-testid="stChatInput"] {
+  border-radius: 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background: rgba(12, 14, 22, 0.92) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+  transition: all 0.25s ease !important;
+  padding: 4px 8px !important;
+}
+
+[data-testid="stChatInput"]:focus-within {
+  border-color: #22d3ee !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9), 0 0 24px -2px rgba(34, 211, 238, 0.45) !important;
+}
+
+[data-testid="stChatInput"] textarea {
+  font-family: var(--font) !important;
+  font-size: 0.95rem !important;
+  color: #f8fafc !important;
+  caret-color: #22d3ee !important;
+}
+
+[data-testid="stChatInput"] button {
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #6366f1, #22d3ee) !important;
+  color: #ffffff !important;
+  border: none !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+[data-testid="stChatInput"] button:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.7) !important;
+}
+
+
 
