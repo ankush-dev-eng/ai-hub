@@ -2527,7 +2527,21 @@ view = uikit.nav()
 if view == uikit.NAV[0]:
     tab_header("Conversational Studio",
                "Unified AI workspace with instant hot-swappable models, code & file attachments, and real-time streaming.")
-    uikit.render_chat(generate)
+
+    mode_c1, mode_c2 = st.columns([6.5, 3.5])
+    with mode_c2:
+        active_chat_engine = st.pills(
+            "Studio Engine:",
+            options=["Studio Multi-Engine", "Universal Hub + RAG"],
+            default="Studio Multi-Engine",
+            key="chat_engine_switcher_pills"
+        )
+
+    if active_chat_engine == "Universal Hub + RAG":
+        import chat_hub
+        chat_hub.render_chat()
+    else:
+        uikit.render_chat(generate)
 
 # ===================================================
 # TAB 2: VISUAL & DOCUMENT AUDITOR
