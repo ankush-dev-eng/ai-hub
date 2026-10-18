@@ -42,6 +42,7 @@ from session_manager import (
 ENV_PATH = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 import html
+import ui_kit as uikit
 
 st.set_page_config(
     page_title="AI Hub",
@@ -49,6 +50,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+uikit.inject_css()
+uikit.inject_js()
 
 # Set STUDIO_PUBLIC_MODE=1 in Streamlit Cloud secrets / env for any public deployment.
 # It hides the API Key Vault (so visitors cannot reveal your keys) and stops listing
@@ -1989,51 +1992,7 @@ with st.sidebar:
     render_telemetry(telemetry_ph)
 
     side_label("Conversations")
-    col_new, col_del = st.columns([1.2, 1])
-    with col_new:
-        if btn("✦ New Chat"):
-            st.session_state.current_session_id = generate_session_id()
-            st.session_state.current_session_title = "New Chat"
-            st.session_state.chat_history = []
-            st.rerun()
-    with col_del:
-        if btn("✕ Delete", help="Permanently delete active chat with 0 residual files"):
-            delete_session(st.session_state.current_session_id)
-            st.session_state.current_session_id = generate_session_id()
-            st.session_state.current_session_title = "New Chat"
-            st.session_state.chat_history = []
-            st.toast("Chat deleted cleanly (0 bytes residue).")
-            st.rerun()
-
-    all_sessions = [] if PUBLIC_MODE else get_all_sessions()
-    session_dict = {}
-    for s in all_sessions:
-        session_dict[s["id"]] = f"{s['title']} ({s['message_count']} msgs)"
-
-    curr_id = st.session_state.current_session_id
-    if curr_id not in session_dict:
-        session_dict[curr_id] = f"{st.session_state.current_session_title} (Active)"
-
-    session_keys = list(session_dict.keys())
-    curr_idx = session_keys.index(curr_id) if curr_id in session_keys else 0
-
-    selected_session = st.selectbox(
-        "Chat History:",
-        options=session_keys,
-        format_func=lambda x: session_dict.get(x, x),
-        index=curr_idx,
-        label_visibility="collapsed"
-    )
-
-    if selected_session != st.session_state.current_session_id:
-        loaded = load_session(selected_session)
-        if loaded:
-            st.session_state.current_session_id = loaded["id"]
-            st.session_state.current_session_title = loaded.get("title", "Chat")
-            st.session_state.chat_history = loaded.get("messages", [])
-            st.rerun()
-
-    ui(f'<div class="session-badge"><span class="dot"></span><span><b>Active</b> &nbsp;{esc(st.session_state.current_session_title)}</span></div>')
+    uikit.render_sidebar_sessions()
 
     side_label("Access")
     with st.expander("🔑 API Key Vault", expanded=False):
@@ -2145,437 +2104,184 @@ providers = [
 ]
 ui(hero_html(providers, pills_html))
 
-tab1, tab2, tab3, tab4 = st.tabs([
-    "⚡ Conversational Studio",
-    "◈ Visual & Document Auditor",
-    "✦ Free Image & Video Studio",
-    "↗ Deployment & Guide"
-])
+def generate(model: dict, messages: list, attachments: list):
+    provider = model.get("provider", "Groq")
+    m_id = model.get("id", "")
+    actual_model = m_id.split(":", 1)[1] if ":" in m_id else m_id
+
+    sys_prompt = (
+        "You are an elite hackathon AI advisor. The current year is 2026. "
+        "All recommendations, frameworks, libraries, and architecture designs must reflect modern 2026 standards. "
+        "Provide crisp, structured answers. "
+        "When providing diagrams, always use valid Mermaid syntax starting with 'flowchart TD' "
+        "on its own line, and enclose all node labels containing parentheses or spaces in double quotes: "
+        'e.g. id["Presentation Service (FastAPI)"].'
+    )
+
+    # 1. Groq Cloud LPU
+    if provider == "Groq":
+        k = groq_key or os.getenv("GROQ_API_KEY", "")
+        if not k:
+            raise Exception("Groq Cloud API Key missing. Add it in the left sidebar API Vault!")
+        from groq import Groq
+        g_client = Groq(api_key=k)
+        formatted = [{"role": "system", "content": sys_prompt}] + messages
+        try:
+            comp = g_client.chat.completions.create(
+                model=actual_model,
+                messages=formatted,
+                temperature=0.7,
+                stream=True
+            )
+            for chunk in comp:
+                delta = chunk.choices[0].delta.content or ""
+                if delta:
+                    yield delta
+        except Exception as groq_err:
+            gk = gemini_key or os.getenv("GEMINI_API_KEY", "")
+            if gk:
+                st.toast("⚡ Groq LPU busy — Failover routing via Gemini 3.5 Flash")
+                yield from generate({"provider": "Gemini", "id": "gemini:gemini-3.5-flash", "name": "Gemini 3.5 Flash"}, messages, attachments)
+            else:
+                raise groq_err
+
+    # 2. Google Gemini
+    elif provider == "Gemini":
+        k = gemini_key or os.getenv("GEMINI_API_KEY", "")
+        if not k:
+            raise Exception("Google Gemini API Key missing. Add it in the left sidebar API Vault!")
+        from google import genai
+        from google.genai import types
+        gm_client = genai.Client(api_key=k)
+
+        contents = []
+        for att in attachments:
+            if att.get("mime", "").startswith("image/"):
+                try:
+                    img = Image.open(io.BytesIO(att["data"]))
+                    contents.append(img)
+                except Exception:
+                    pass
+        if len(messages) > 1:
+            hist_str = "Conversation history:\n"
+            for m in messages[:-1]:
+                hist_str += f"{m['role'].capitalize()}: {m['content']}\n"
+            hist_str += f"\nCurrent message:\n{messages[-1]['content']}"
+            contents.append(hist_str)
+        elif messages:
+            contents.append(messages[-1]["content"])
+
+        try:
+            resp_stream = gm_client.models.generate_content_stream(
+                model=actual_model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=sys_prompt,
+                    temperature=0.7
+                )
+            )
+            for chunk in resp_stream:
+                if chunk.text:
+                    yield chunk.text
+        except Exception as gem_err:
+            if "RESOURCE_EXHAUSTED" in str(gem_err) or "429" in str(gem_err):
+                st.toast("⚡ Gemini quota limit — Failover routing via Groq LPU")
+                g_k = groq_key or os.getenv("GROQ_API_KEY", "")
+                if g_k:
+                    yield from generate({"provider": "Groq", "id": "groq:qwen/qwen3.8-27b", "name": "Qwen 3.8 27B"}, messages, attachments)
+                else:
+                    raise gem_err
+            else:
+                raise gem_err
+
+    # 3. OpenRouter Free Cluster
+    elif provider == "OpenRouter":
+        k = openrouter_key or os.getenv("OPENROUTER_API_KEY", "")
+        if not k:
+            raise Exception("OpenRouter API Key missing. Add it in the left sidebar API Vault!")
+        headers = {
+            "Authorization": f"Bearer {k}",
+            "HTTP-Referer": "http://localhost:8501",
+            "X-Title": "AI Hub",
+            "Content-Type": "application/json"
+        }
+        formatted = [{"role": "system", "content": sys_prompt}] + messages
+        payload = {"model": actual_model, "messages": formatted, "stream": True}
+        with httpx.Client(timeout=35.0) as client:
+            with client.stream("POST", "https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload) as response:
+                if response.status_code != 200:
+                    err_text = response.read().decode("utf-8", errors="ignore")
+                    raise Exception(f"HTTP {response.status_code}: {err_text[:120]}")
+                for line in response.iter_lines():
+                    line = line.strip()
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                        delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        if delta:
+                            yield delta
+                    except Exception:
+                        continue
+
+    # 4. Adaption Labs
+    elif provider == "Adaption":
+        k = adaption_key or os.getenv("ADAPTION_API_KEY", "")
+        if not k:
+            raise Exception("Adaption Labs Key missing. Add it in the left sidebar API Vault!")
+        headers = {"Authorization": f"Bearer {k}", "Content-Type": "application/json"}
+        formatted = [{"role": "system", "content": sys_prompt}] + messages
+        payload = {"model": actual_model, "messages": formatted, "stream": True}
+        with httpx.Client(timeout=25.0) as client:
+            with client.stream("POST", "https://api.adaptionlabs.ai/v1/chat/completions", headers=headers, json=payload) as response:
+                if response.status_code != 200:
+                    err_text = response.read().decode("utf-8", errors="ignore")
+                    raise Exception(f"HTTP {response.status_code}: {err_text[:120]}")
+                for line in response.iter_lines():
+                    line = line.strip()
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                        delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        if delta:
+                            yield delta
+                    except Exception:
+                        continue
+
+    # 5. Colab GPU
+    elif "Colab" in provider or "colab" in actual_model.lower():
+        colab_url = st.session_state.get("colab_tunnel_url", "")
+        if not colab_url:
+            raise Exception("Google Colab GPU Bridge is not connected. Enter your Cloudflare URL in Tab 3!")
+        last_q = messages[-1]["content"] if messages else ""
+        hist = messages[:-1]
+        reply = call_colab_chat(colab_url, last_q, hist)
+        yield reply
+
+    else:
+        yield from generate({"provider": "Groq", "id": "groq:qwen/qwen3.8-27b", "name": "Qwen 3.8 27B"}, messages, attachments)
+
+view = uikit.nav()
 
 # ===================================================
 # TAB 1: CONVERSATIONAL STUDIO
 # ===================================================
-with tab1:
+if view == uikit.NAV[0]:
     tab_header("Conversational Studio",
                "Unified AI workspace with instant hot-swappable models, code & file attachments, and real-time streaming.")
-
-    # Top action bar: Active Session Status & New Chat
-    c_status_left, c_clear_col = st.columns([3.5, 0.9], gap="medium")
-    with c_status_left:
-        active_sess = st.session_state.current_session_title
-        ui(f'<div class="session-badge" style="margin:0;"><span class="dot"></span><span><b>Current Chat:</b> &nbsp;{esc(active_sess)}</span></div>')
-    with c_clear_col:
-        if btn("🧹 New Chat", help="Start fresh conversation"):
-            st.session_state.chat_history = []
-            st.session_state.current_session_id = generate_session_id()
-            st.session_state.current_session_title = "New Conversation"
-            st.rerun()
-
-    # 1. Render all messages in chronological order (Conversation Flow)
-    empty_ph = st.empty()
-    if not st.session_state.chat_history:
-        ui("""
-        <div class="empty flat">
-          <div class="empty-ico">⚡</div>
-          <div class="empty-t">AI Studio Ready</div>
-          <div class="empty-d">Ask anything, attach code or files below, or pick a starter prompt.</div>
-        </div>
-        """, empty_ph)
-
-    for msg in st.session_state.chat_history:
-        with st.chat_message(msg["role"], avatar=AVATARS.get(msg["role"])):
-            sanitized = sanitize_markdown_text(msg["content"])
-            st.markdown(sanitized)
-
-    # 2. NEXT INSTRUCTION DOCK (Positioned directly after the previous response!)
-    ui('<div id="chat-bottom-anchor" style="height: 10px; margin-bottom: 8px;"></div>')
-    ui('<div style="margin-top: 1.2rem; margin-bottom: 0.4rem; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; display: flex; align-items: center; gap: 6px;"><span>⚡</span><span>Next Instruction & Model Engine</span></div>')
-
-    is_colab_active = bool(st.session_state.get("colab_connected", False))
-    agent_models = [
-        "⚡ Groq: qwen/qwen3.8-27b (Modern 2026, 600+ t/s)",
-        "⚡ Groq: openai/gpt-oss-120b (120B Open Weights Reasoning)",
-        "⚡ Groq: meta-llama/llama-3.3-70b-versatile (Flagship Versatile)",
-        "✨ Gemini: gemini-3.5-flash (Official Multimodal Vision + 1M Context)",
-        "✨ Gemini: gemini-3.5-flash-lite (Ultra-Low Latency)",
-        "🧠 OpenRouter: meta-llama/llama-3.3-70b-instruct:free (OpenRouter Free)",
-        "🧠 OpenRouter: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-        "🧩 Adaption Labs: adaption/base-router (Domain LoRA Mesh)"
-    ]
-    if is_colab_active:
-        agent_models.insert(0, "🚀 Google Colab: qwen/qwen-2.5-7b-local (16GB Dedicated GPU • Uncensored)")
-
-    # Official Brand Badges Bar
-    if "chat_provider_filter" not in st.session_state:
-        st.session_state.chat_provider_filter = "All"
-
-    prov_bar_cols = st.columns([1, 1, 1, 1.2, 1.1, 0.7], gap="small")
-    with prov_bar_cols[0]:
-        if btn("⚡ Groq LPU", key="btn_filter_groq"):
-            st.session_state.chat_provider_filter = "Groq"
-            st.rerun()
-    with prov_bar_cols[1]:
-        if btn("✨ Gemini", key="btn_filter_gemini"):
-            st.session_state.chat_provider_filter = "Gemini"
-            st.rerun()
-    with prov_bar_cols[2]:
-        if btn("🧠 OpenRouter", key="btn_filter_openrouter"):
-            st.session_state.chat_provider_filter = "OpenRouter"
-            st.rerun()
-    with prov_bar_cols[3]:
-        if is_colab_active:
-            if btn("🚀 Colab GPU (Active)", key="btn_filter_colab"):
-                st.session_state.chat_provider_filter = "Colab"
-                st.rerun()
-        else:
-            if btn("🚀 Colab (Offline)", key="btn_filter_colab_off", help="Connect tunnel in Tab 3 to use"):
-                st.toast("💡 Connect your Google Colab URL in Tab 3 to enable 16GB Dedicated GPU chat.")
-    with prov_bar_cols[4]:
-        if btn("🧩 Adaption", key="btn_filter_adaption"):
-            st.session_state.chat_provider_filter = "Adaption"
-            st.rerun()
-    with prov_bar_cols[5]:
-        if btn("✦ All", key="btn_filter_all"):
-            st.session_state.chat_provider_filter = "All"
-            st.rerun()
-
-    active_p_filter = st.session_state.get("chat_provider_filter", "All")
-    if active_p_filter != "All":
-        filtered_models = [m for m in agent_models if active_p_filter in m]
-        if not filtered_models:
-            filtered_models = agent_models
-    else:
-        filtered_models = agent_models
-
-    c_model_dock, c_file_toggle = st.columns([3.2, 1.2], gap="medium")
-    with c_model_dock:
-        selected_agent_model = st.selectbox(
-            "Model Engine (Hot-Swappable with Official Logos):",
-            filtered_models,
-            index=0,
-            key=f"chat_engine_model_{active_p_filter}"
-        )
-        if "Groq" in selected_agent_model:
-            provider = "Groq Cloud LPU"
-            model_name = selected_agent_model.split(":")[1].split("(")[0].strip()
-        elif "Gemini" in selected_agent_model:
-            provider = "Google Gemini"
-            model_name = selected_agent_model.split(":")[1].split("(")[0].strip()
-        elif "OpenRouter" in selected_agent_model:
-            provider = "OpenRouter Cloud"
-            model_name = selected_agent_model.split(":")[1].split("(")[0].strip()
-        elif "Colab" in selected_agent_model:
-            provider = "Google Colab GPU"
-            model_name = "qwen/qwen-2.5-7b-local"
-        else:
-            provider = "Adaption Labs"
-            model_name = selected_agent_model.split(":")[1].split("(")[0].strip()
-
-    with c_file_toggle:
-        st.write("")
-        st.write("")
-        attach_open = st.checkbox("📎 Attach Files / Code", value=False, key="antigravity_attach_toggle", help="Attach Python, JavaScript, CSS, HTML, CSV, PDF, or screenshots")
-
-    chat_files = []
-    if attach_open:
-        with st.container():
-            chat_files = st.file_uploader(
-                "Select files to analyze in conversation context (Code, CSV, PDF, Images):",
-                accept_multiple_files=True,
-                type=["py", "js", "ts", "html", "css", "json", "sql", "sh", "txt", "md", "csv", "png", "jpg", "jpeg", "webp", "pdf"],
-                key="chat_files_uploader"
-            )
-            if chat_files:
-                chips_list = [f"📎 {f.name} ({round(f.size/1024, 1)} KB)" for f in chat_files]
-                ui(chips(chips_list))
-
-    # Starter pills in clean compact row
-    p_cols = st.columns(4)
-    with p_cols[0]:
-        if btn("✦ Pitch", help="Generate a winning 3-sentence elevator pitch"):
-            st.session_state.preset_prompt = "Write a 3-sentence high-impact winning hackathon elevator pitch for an AI automated waste management drone."
-    with p_cols[1]:
-        if btn("⬡ Arch Flow", help="Generate tech stack flow diagram & Mermaid architecture"):
-            st.session_state.preset_prompt = "Provide a clean 5-step technical architecture diagram and API flow for a real-time multimodal AI app. Include valid Mermaid flowchart TD syntax with quoted node labels."
-    with p_cols[2]:
-        if btn("◈ Code Review", help="Review code bottlenecks and suggest async fixes"):
-            st.session_state.preset_prompt = "Review this code for performance bottlenecks, security flaws, and suggest an async optimization with clean type hints."
-    with p_cols[3]:
-        if btn("⚡ Fast MVP", help="Break down a project into a 2-hour build plan"):
-            st.session_state.preset_prompt = "Break down a winning 2-hour hackathon MVP build plan: Frontend, Backend API, Database, and Demo flow."
-
-    # Render synchronized model spec & knowledge card with Official Provider Logo
-    render_model_intelligence_card(model_name)
-
-    input_box_value = st.session_state.pop("preset_prompt", None)
-    user_prompt = st.chat_input("Ask anything (ideas, architecture, code, business model)...") or input_box_value
-
-    if user_prompt:
-        actual_model = model_name.split()[0]
-        empty_ph.empty()
-        if len(st.session_state.chat_history) == 0:
-            auto_title = derive_auto_title(user_prompt, groq_key)
-            st.session_state.current_session_title = auto_title
-
-        # Read any attached files
-        attached_file_context = ""
-        attached_images = []
-        attached_names = []
-        if chat_files:
-            for f in chat_files:
-                attached_names.append(f.name)
-                ext = f.name.split(".")[-1].lower()
-                if ext in ["png", "jpg", "jpeg", "webp"]:
-                    try:
-                        attached_images.append(Image.open(f))
-                    except Exception:
-                        pass
-                elif ext in ["py", "js", "ts", "html", "css", "json", "sql", "sh", "txt", "md", "csv"]:
-                    try:
-                        c_text = f.read().decode("utf-8", errors="ignore")
-                        attached_file_context += f"\n\n--- File: `{f.name}` ---\n```{ext}\n{c_text}\n```"
-                    except Exception:
-                        pass
-                elif ext == "pdf":
-                    try:
-                        import pypdf
-                        reader = pypdf.PdfReader(f)
-                        p_txt = "".join([page.extract_text() or "" for page in reader.pages[:10]])
-                        attached_file_context += f"\n\n--- Document: `{f.name}` ---\n{p_txt}\n"
-                    except Exception:
-                        pass
-
-        # Build display text
-        display_user_msg = user_prompt
-        if attached_names:
-            display_user_msg += "\n\n" + " ".join([f"`📎 {n}`" for n in attached_names])
-
-        st.session_state.chat_history.append({"role": "user", "content": display_user_msg})
-        with st.chat_message("user", avatar=AVATARS["user"]):
-            st.markdown(display_user_msg)
-            for im in attached_images:
-                st.image(im, width=280)
-
-        # Full prompt with code context for model
-        full_user_query = user_prompt
-        if attached_file_context:
-            full_user_query += "\n\n### Attached Files Context:\n" + attached_file_context
-
-        with st.chat_message("assistant", avatar=AVATARS["assistant"]):
-            message_placeholder = st.empty()
-            full_response = ""
-            t0 = time.time()
-
-            try:
-                system_instruction = (
-                    "You are an elite hackathon AI advisor. The current year is 2026. "
-                    "All recommendations, frameworks, libraries, and architecture designs must reflect modern 2026 standards. "
-                    "Provide crisp, structured answers. "
-                    "When providing diagrams, always use valid Mermaid syntax starting with 'flowchart TD' "
-                    "on its own line, and enclose all node labels containing parentheses or spaces in double quotes: "
-                    'e.g. id["Presentation Service (FastAPI)"].'
-                )
-
-                failover_badge = ""
-
-                def stream_via_groq(m_id="qwen/qwen3.8-27b"):
-                    if not groq_key:
-                        raise Exception("Groq API key missing")
-                    g_client = Groq(api_key=groq_key)
-                    msgs = [{"role": "system", "content": system_instruction}]
-                    for m in st.session_state.chat_history[:-1]:
-                        msgs.append({"role": m["role"], "content": m["content"]})
-                    msgs.append({"role": "user", "content": full_user_query})
-                    comp = g_client.chat.completions.create(model=m_id, messages=msgs, stream=True)
-                    text_acc = ""
-                    for chunk in comp:
-                        delta = chunk.choices[0].delta.content or ""
-                        text_acc += delta
-                        message_placeholder.markdown(text_acc + "▌")
-                    return text_acc
-
-                def stream_via_gemini(m_id="gemini-3.5-flash"):
-                    if not gemini_key:
-                        raise Exception("Gemini API key missing")
-                    gm_client = genai.Client(api_key=gemini_key)
-                    full_p = system_instruction + "\n\n"
-                    for m in st.session_state.chat_history[:-1]:
-                        full_p += f"{m['role'].upper()}: {m['content']}\n"
-                    full_p += f"USER: {full_user_query}\n"
-                    contents = [*attached_images, full_p] if attached_images else full_p
-                    try:
-                        resp = gm_client.models.generate_content(model=m_id, contents=contents)
-                    except Exception:
-                        resp = gm_client.models.generate_content(model="gemini-3.5-flash-lite", contents=contents)
-                    text_acc = resp.text
-                    message_placeholder.markdown(text_acc)
-                    return text_acc
-
-                if attached_images:
-                    st.toast("🖼️ Images detected: Automatically using Gemini Flash Multimodal Vision.")
-                    full_response = stream_via_gemini("gemini-3.5-flash")
-                elif "Groq" in provider:
-                    if not groq_key:
-                        st.error("Please add your Groq Cloud Key in the left sidebar API Vault!")
-                    else:
-                        try:
-                            full_response = stream_via_groq(actual_model)
-                        except Exception as e:
-                            failover_badge = "⚡ Groq model busy — Auto-routed to Gemini Flash."
-                            st.toast(failover_badge)
-                            try:
-                                full_response = stream_via_gemini("gemini-3.5-flash")
-                            except Exception:
-                                full_response = stream_via_groq("qwen/qwen3.8-27b")
-
-                elif "OpenRouter" in provider:
-                    if not openrouter_key:
-                        st.error("Please add your OpenRouter API Key in the left sidebar API Vault!")
-                    else:
-                        try:
-                            messages = [{"role": "system", "content": system_instruction}]
-                            messages += [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history]
-                            headers = {
-                                "Authorization": f"Bearer {openrouter_key}",
-                                "HTTP-Referer": "http://localhost:8501",
-                                "X-Title": "AI Hub",
-                                "Content-Type": "application/json"
-                            }
-                            payload = {
-                                "model": actual_model,
-                                "messages": messages,
-                                "stream": True
-                            }
-                            with httpx.Client(timeout=35.0) as client:
-                                with client.stream("POST", "https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload) as response:
-                                    if response.status_code != 200:
-                                        err_text = response.read().decode("utf-8", errors="ignore")
-                                        raise Exception(f"HTTP {response.status_code}: {err_text[:120]}")
-                                    for line in response.iter_lines():
-                                        line = line.strip()
-                                        if not line or not line.startswith("data: "):
-                                            continue
-                                        data_str = line[6:]
-                                        if data_str == "[DONE]":
-                                            break
-                                        try:
-                                            chunk = json.loads(data_str)
-                                            delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                            if delta:
-                                                full_response += delta
-                                                message_placeholder.markdown(full_response + "▌")
-                                        except Exception:
-                                            continue
-                        except Exception as or_err:
-                            failover_badge = f"⚡ Target unavailable ({actual_model}) — Auto-routed via Groq LPU."
-                            st.toast(failover_badge)
-                            try:
-                                full_response = stream_via_groq("qwen/qwen3.8-27b")
-                            except Exception:
-                                full_response = stream_via_gemini("gemini-3.5-flash")
-
-                elif "Adaption" in provider:
-                    if not adaption_key:
-                        st.error("Please add your Adaption Labs Key in the left sidebar API Vault!")
-                    else:
-                        try:
-                            messages = [{"role": "system", "content": system_instruction}]
-                            messages += [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history]
-                            headers = {
-                                "Authorization": f"Bearer {adaption_key}",
-                                "Content-Type": "application/json"
-                            }
-                            payload = {
-                                "model": actual_model,
-                                "messages": messages,
-                                "stream": True
-                            }
-                            with httpx.Client(timeout=25.0) as client:
-                                with client.stream("POST", "https://api.adaptionlabs.ai/v1/chat/completions", headers=headers, json=payload) as response:
-                                    if response.status_code != 200:
-                                        err_text = response.read().decode("utf-8", errors="ignore")
-                                        raise Exception(f"HTTP {response.status_code}: {err_text[:120]}")
-                                    for line in response.iter_lines():
-                                        line = line.strip()
-                                        if not line or not line.startswith("data: "):
-                                            continue
-                                        data_str = line[6:]
-                                        if data_str == "[DONE]":
-                                            break
-                                        try:
-                                            chunk = json.loads(data_str)
-                                            delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                            if delta:
-                                                full_response += delta
-                                                message_placeholder.markdown(full_response + "▌")
-                                        except Exception:
-                                            continue
-                        except Exception as ad_err:
-                            failover_badge = "⚡ Adaption Labs under maintenance (HTTP 503) — Auto-routed via Groq LPU."
-                            st.toast(failover_badge)
-                            try:
-                                full_response = stream_via_groq("qwen/qwen3.8-27b")
-                            except Exception:
-                                full_response = stream_via_gemini("gemini-3.5-flash")
-
-                elif "Colab" in provider or "colab" in actual_model.lower():
-                    try:
-                        colab_target_url = st.session_state.get("colab_tunnel_url", "")
-                        if not colab_target_url:
-                            raise Exception("No active Colab URL. Please connect in Tab 3.")
-                        full_response = call_colab_chat(colab_target_url, full_user_query, st.session_state.chat_history)
-                        message_placeholder.markdown(sanitize_markdown_text(full_response))
-                    except Exception as colab_err:
-                        failover_badge = f"⚡ Colab tunnel busy ({colab_err}) — Auto-routed via Groq LPU."
-                        st.toast(failover_badge)
-                        full_response = stream_via_groq("qwen/qwen3.8-27b")
-
-                else:
-                    if not gemini_key:
-                        st.error("Please add your Gemini API Key in the left sidebar API Vault!")
-                    else:
-                        try:
-                            full_response = stream_via_gemini(actual_model)
-                        except Exception as g_err:
-                            failover_badge = "⚡ Gemini quota limit — Auto-routed via Groq LPU."
-                            st.toast(failover_badge)
-                            try:
-                                full_response = stream_via_groq("qwen/qwen3.8-27b")
-                            except Exception:
-                                full_response = stream_via_gemini("gemini-3.5-flash-lite")
-
-                if full_response:
-                    elapsed = time.time() - t0
-                    clean_output = sanitize_markdown_text(full_response)
-                    message_placeholder.markdown(clean_output)
-                    wps = len(full_response.split()) / max(elapsed, 0.01)
-                    chip_items = [
-                        f"<b>{elapsed:.2f}s</b> total",
-                        f"<b>{wps:.0f}</b> words/sec",
-                        esc(model_name)
-                    ]
-                    if failover_badge:
-                        chip_items.append(f"<span style='color:var(--amber); font-weight:600;'>{failover_badge}</span>")
-                    ui(chips(chip_items))
-
-                    st.session_state.last_latency = elapsed
-                    render_telemetry(telemetry_ph)
-
-                    st.session_state.chat_history.append({"role": "assistant", "content": full_response})
-                    save_session(
-                        st.session_state.current_session_id,
-                        st.session_state.current_session_title,
-                        st.session_state.chat_history
-                    )
-                    st.rerun()
-
-            except Exception as e:
-                st.error(f"API Error ({provider}): {e}")
+    uikit.render_chat(generate)
 
 # ===================================================
 # TAB 2: VISUAL & DOCUMENT AUDITOR
 # ===================================================
-with tab2:
+elif view == uikit.NAV[1]:
     tab_header("Visual & Document Auditor",
                "Cross-examine several screenshots, images and PDFs at once with Gemini Flash.")
 
@@ -2615,7 +2321,8 @@ with tab2:
                             img = Image.open(io.BytesIO(item["bytes"]))
                             images_to_analyze.append(img)
                             with c:
-                                show_image(img, caption=item["name"])
+                                uikit.media_card("image", img, key=f"auditor_img_{idx}")
+                                st.caption(item["name"])
 
             step(2, "Choose an objective", "The prompt below updates instantly.")
             mode_preset = st.selectbox(
@@ -2759,7 +2466,7 @@ with tab2:
 # ===================================================
 # TAB 3: FREE CLOUD IMAGE & VIDEO STUDIO
 # ===================================================
-with tab3:
+elif view == uikit.NAV[2]:
     tab_header("Free Cloud & Colab Media Studio",
                "Native 1024x1024 visuals and 5–30s multi-scene MP4 video. 100% free with 0% laptop GPU load.")
 
@@ -3044,7 +2751,8 @@ with tab3:
 
             if st.session_state.tab3_image_bytes:
                 gen_image = Image.open(io.BytesIO(st.session_state.tab3_image_bytes))
-                show_image(gen_image, caption=st.session_state.tab3_image_caption)
+                uikit.media_card("image", gen_image, key="tab3_img_main")
+                st.caption(st.session_state.tab3_image_caption)
 
                 c_img_down, c_img_clear = st.columns([2, 1])
                 with c_img_down:
@@ -3072,7 +2780,8 @@ with tab3:
                             except Exception as u_err:
                                 st.error(f"4K Upscale Error: {u_err}")
                     if st.session_state.get("tab3_4k_upscaled"):
-                        show_image(Image.open(io.BytesIO(st.session_state.tab3_4k_upscaled)), caption="4096×4096 4K Ultra-HD Visual (Real-ESRGAN / Lanczos)")
+                        uikit.media_card("image", Image.open(io.BytesIO(st.session_state.tab3_4k_upscaled)), key="tab3_img_4k")
+                        st.caption("4096×4096 4K Ultra-HD Visual (Real-ESRGAN / Lanczos)")
                         dl_btn("⬇️ Download 4K Visual (.jpg)", data=st.session_state.tab3_4k_upscaled, file_name=f"visual_4k_{int(time.time())}.jpg", mime="image/jpeg")
 
     # ---- Video Studio ----
@@ -3236,7 +2945,7 @@ with tab3:
                             vid_status_box.error(f"Video Generation Error: {e}")
 
             if st.session_state.tab3_video_bytes:
-                st.video(st.session_state.tab3_video_bytes)
+                uikit.media_card("video", st.session_state.tab3_video_bytes, key="tab3_vid_main")
                 st.caption(st.session_state.tab3_video_caption)
 
                 c_vid_down, c_vid_clear = st.columns([2, 1])
@@ -3318,7 +3027,7 @@ with tab3:
 # ===================================================
 # TAB 4: DEPLOYMENT & FREE AI GUIDE
 # ===================================================
-with tab4:
+elif view == uikit.NAV[3]:
     tab_header("GitHub Live Deployment & Cloud Studio",
                "Connect your GitHub account, publish to any repository of your choice, and launch live on Streamlit Cloud with 1 click.")
 
