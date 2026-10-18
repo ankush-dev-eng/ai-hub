@@ -1010,19 +1010,43 @@ def interpolate_video(req: InterpolateRequest):
 with open("colab_bridge_server.py", "w") as f:
     f.write(server_code)
 
-# 3. Clean restart of server & Cloudflare tunnel
-import subprocess, time, re, urllib.request
+# 3. Clean restart of server & Cloudflare tunnel (Proxy-Free + Health Gated)
+import subprocess, time, re, sys, os, urllib.request
 
-!pkill -9 -f uvicorn > /dev/null 2>&1
-!pkill -9 -f cloudflared > /dev/null 2>&1
+# Kill any lingering processes on port 8000
+!fuser -k 8000/tcp > /dev/null 2>&1 || true
+!pkill -9 -f uvicorn > /dev/null 2>&1 || true
+!pkill -9 -f cloudflared > /dev/null 2>&1 || true
 time.sleep(1)
 
-proc = subprocess.Popen(["uvicorn", "colab_bridge_server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"])
-print("⏳ Initializing GPU Microservice... Waiting for health check...")
+# Test import directly in notebook kernel first
+try:
+    import colab_bridge_server
+    print("✅ colab_bridge_server module verified!")
+except Exception as e:
+    import traceback
+    print("❌ Import Error:")
+    traceback.print_exc()
+
+# Launch uvicorn via sys.executable with full logging
+log_file = open("uvicorn.log", "w")
+proc = subprocess.Popen(
+    [sys.executable, "-m", "uvicorn", "colab_bridge_server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"],
+    stdout=log_file,
+    stderr=subprocess.STDOUT
+)
+
+print("⏳ Initializing GPU Microservice... Waiting for health check on http://127.0.0.1:8000...")
+proxy_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 server_ready = False
-for _ in range(60):
+for _ in range(40):
+    if proc.poll() is not None:
+        print(f"❌ Uvicorn exited prematurely with code {proc.returncode}!")
+        with open("uvicorn.log", "r") as f:
+            print(f.read())
+        break
     try:
-        with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=1) as res:
+        with proxy_opener.open("http://127.0.0.1:8000/health", timeout=1) as res:
             if res.status == 200:
                 server_ready = True
                 print("✅ GPU Microservice is verified ONLINE on http://127.0.0.1:8000!")
@@ -1031,7 +1055,23 @@ for _ in range(60):
         pass
     time.sleep(0.5)
 
-tunnel = subprocess.Popen(["cloudflared", "tunnel", "--url", "http://127.0.0.1:8000"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+if not server_ready and proc.poll() is None:
+    print("⚠️ Server is taking longer than expected. Recent logs:")
+    with open("uvicorn.log", "r") as f:
+        print(f.read()[-500:])
+
+# Clear proxy environment for cloudflared to connect directly to 127.0.0.1
+cf_env = {k: v for k, v in os.environ.items() if not k.lower().endswith("_proxy")}
+cf_env["NO_PROXY"] = "*"
+cf_env["no_proxy"] = "*"
+
+tunnel = subprocess.Popen(
+    ["cloudflared", "tunnel", "--url", "http://127.0.0.1:8000"],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+    env=cf_env
+)
 print("🚀 Starting Cloudflare Tunnel... Generating public endpoint...")
 for _ in range(45):
     line = tunnel.stderr.readline()
