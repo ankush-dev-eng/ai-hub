@@ -569,7 +569,7 @@ def synthesize_multiscene_video(prompt: str, width: int = 704, height: int = 512
         
         img = None
         # Try multiple models to guarantee 100% success without 402 payment wall
-        for pmodel in ["flux-realism", "turbo", "flux-3d", "flux", "any-dark"]:
+        for pmodel in ["turbo", "flux-realism", "flux-3d", "flux", "any-dark"]:
             try:
                 url = f"https://image.pollinations.ai/prompt/{enc}?width=1024&height=768&model={pmodel}&nologo=true&seed={base_seed + i * 211}"
                 with httpx.Client(timeout=25.0) as client:
@@ -585,9 +585,17 @@ def synthesize_multiscene_video(prompt: str, width: int = 704, height: int = 512
                 raw_bytes = generate_cloud_image_flux_or_horde(scene_prompt, width=1024, height=768, hf_token=hf_token)
                 img = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
             except Exception:
-                img = Image.new("RGB", (1024, 768), color=(14, 16, 24))
+                pass
+                
+        # Absolute guarantee: NEVER produce a black frame. If scene generation failed, smoothly clone previous scene!
+        if img is None:
+            if scene_images:
+                img = scene_images[-1].copy()
+            else:
+                img = Image.new("RGB", (1024, 768), color=(18, 22, 36))
                 
         scene_images.append(img)
+        time.sleep(1.2)  # Delay between requests to prevent Pollinations 402 rapid-fire rate limit
             
     if status_placeholder:
         status_placeholder.info(f"🎞️ Compiling {total_duration}s fluid multi-scene video with cosine optical interpolation...")
@@ -706,6 +714,217 @@ def generate_cloud_video_ltx(prompt: str, width: int = 704, height: int = 512, d
             return synthesize_multiscene_video(prompt, width=width, height=height, total_duration=duration, hf_token=hf_token, status_placeholder=status_placeholder)
         except Exception as inner_e:
             raise Exception(f"Video synthesis failed: {e} | Fallback error: {inner_e}")
+
+# ----------------- GOOGLE COLAB DEDICATED GPU BRIDGE -----------------
+COLAB_SERVER_SNIPPET = """# ==============================================================================
+# 🚀 AI HUB GOOGLE COLAB GPU BRIDGE (FASTAPI + DIFFUSERS + CLOUDFLARE TUNNEL)
+# 100% Free 16GB Dedicated T4 GPU for True Spatio-Temporal Video Diffusion & SDXL
+# ==============================================================================
+
+# 1. Install dependencies
+!pip install -q fastapi uvicorn diffusers transformers accelerate torch pyngrok pillow imageio[ffmpeg] torchvision sentencepiece
+!wget -q -nc https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+!dpkg -i cloudflared-linux-amd64.deb > /dev/null 2>&1
+print("✅ Dependencies and Cloudflare Tunnel installed successfully!")
+
+# 2. Build the GPU Microservice
+server_code = '''
+import os, io, time, base64
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response
+from pydantic import BaseModel
+import torch
+from PIL import Image
+import imageio
+import numpy as np
+
+app = FastAPI(title="AI Hub Colab GPU Bridge")
+
+VIDEO_PIPE = None
+IMAGE_PIPE = None
+
+def get_video_pipeline():
+    global VIDEO_PIPE
+    if VIDEO_PIPE is None:
+        from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+        print("⚡ Loading damo-vilab/text-to-video-ms-1.7b onto T4 GPU...")
+        pipe = DiffusionPipeline.from_pretrained(
+            "damo-vilab/text-to-video-ms-1.7b", 
+            torch_dtype=torch.float16, 
+            variant="fp16"
+        )
+        pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+        pipe.enable_model_cpu_offload()
+        VIDEO_PIPE = pipe
+    return VIDEO_PIPE
+
+def get_image_pipeline():
+    global IMAGE_PIPE
+    if IMAGE_PIPE is None:
+        from diffusers import AutoPipelineForText2Image
+        print("⚡ Loading stabilityai/sdxl-turbo onto T4 GPU...")
+        pipe = AutoPipelineForText2Image.from_pretrained(
+            "stabilityai/sdxl-turbo",
+            torch_dtype=torch.float16,
+            variant="fp16"
+        )
+        pipe.to("cuda")
+        IMAGE_PIPE = pipe
+    return IMAGE_PIPE
+
+@app.get("/health")
+def health():
+    gpu_available = torch.cuda.is_available()
+    gpu_name = torch.cuda.get_device_name(0) if gpu_available else "CPU (Warning: No GPU)"
+    vram_gb = round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 1) if gpu_available else 0
+    return {
+        "status": "healthy",
+        "gpu": gpu_name,
+        "vram_gb": vram_gb,
+        "cuda_version": torch.version.cuda if gpu_available else None
+    }
+
+class ImageGenRequest(BaseModel):
+    prompt: str
+    width: int = 1024
+    height: int = 1024
+    num_inference_steps: int = 2
+
+@app.post("/generate-image")
+def generate_image(req: ImageGenRequest):
+    try:
+        pipe = get_image_pipeline()
+        img = pipe(prompt=req.prompt, num_inference_steps=max(1, min(req.num_inference_steps, 4)), guidance_scale=0.0).images[0]
+        if (img.width, img.height) != (req.width, req.height):
+            img = img.resize((req.width, req.height), Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="WEBP", quality=92)
+        return Response(content=buf.getvalue(), media_type="image/webp")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class VideoGenRequest(BaseModel):
+    prompt: str
+    width: int = 512
+    height: int = 512
+    duration: int = 4
+    fps: int = 16
+
+@app.post("/generate-video")
+def generate_video(req: VideoGenRequest):
+    try:
+        pipe = get_video_pipeline()
+        num_frames = max(16, min(int(req.duration * 6), 32))
+        video_frames = pipe(req.prompt, num_frames=num_frames, height=req.height, width=req.width, num_inference_steps=25).frames[0]
+        buf = io.BytesIO()
+        if isinstance(video_frames, np.ndarray):
+            if video_frames.dtype != np.uint8:
+                video_frames = (video_frames * 255).astype(np.uint8)
+        writer = imageio.get_writer(buf, format="mp4", fps=req.fps, codec="libx264")
+        for frame in video_frames:
+            if not isinstance(frame, np.ndarray):
+                frame = np.array(frame)
+            if frame.dtype != np.uint8:
+                frame = (frame * 255).astype(np.uint8)
+            writer.append_data(frame)
+        writer.close()
+        return Response(content=buf.getvalue(), media_type="video/mp4")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+'''
+
+with open("colab_bridge_server.py", "w") as f:
+    f.write(server_code)
+
+# 3. Launch Server & Start Cloudflare Tunnel
+import subprocess, time, re
+
+proc = subprocess.Popen(["uvicorn", "colab_bridge_server:app", "--port", "8000"])
+time.sleep(2)
+
+tunnel = subprocess.Popen(["cloudflared", "tunnel", "--url", "http://localhost:8000"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+print("🚀 Starting Cloudflare Tunnel... Generating public endpoint...")
+for _ in range(35):
+    line = tunnel.stderr.readline()
+    if "trycloudflare.com" in line:
+        match = re.search(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", line)
+        if match:
+            url = match.group(0)
+            print("\\n" + "="*60)
+            print("🎉 YOUR COLAB GPU BRIDGE URL IS READY:")
+            print(f"👉  {url}  👈")
+            print("="*60)
+            print("Copy this link and paste it into AI Hub Tab 3 -> Google Colab GPU Bridge!")
+            break
+    time.sleep(0.5)
+"""
+
+def check_colab_health(colab_url: str) -> tuple[bool, str, str]:
+    """Tests connection to user's Google Colab GPU bridge. Returns (is_healthy, gpu_name, latency_str)."""
+    if not colab_url or not colab_url.strip():
+        return False, "No URL provided", ""
+    clean_url = colab_url.strip().rstrip("/")
+    if not clean_url.startswith("http"):
+        clean_url = "https://" + clean_url
+    try:
+        t0 = time.time()
+        with httpx.Client(timeout=6.0, follow_redirects=True) as client:
+            resp = client.get(f"{clean_url}/health")
+            latency = time.time() - t0
+            if resp.status_code == 200:
+                data = resp.json()
+                gpu_name = data.get("gpu", "NVIDIA GPU")
+                vram = data.get("vram_gb", "16")
+                return True, f"{gpu_name} ({vram} GB VRAM)", f"{int(latency * 1000)}ms"
+            return False, f"HTTP {resp.status_code}", f"{int(latency * 1000)}ms"
+    except Exception as e:
+        return False, str(e), ""
+
+def generate_colab_video(colab_url: str, prompt: str, width: int = 512, height: int = 512, duration: int = 4, status_placeholder=None) -> bytes:
+    """Generates true motion video diffusion frames on user's Google Colab GPU and returns MP4 bytes."""
+    clean_url = colab_url.strip().rstrip("/")
+    if not clean_url.startswith("http"):
+        clean_url = "https://" + clean_url
+    if status_placeholder:
+        status_placeholder.info(f"⚡ Connected to Colab GPU: Synthesizing true spatio-temporal video diffusion ({width}x{height}, {duration}s)...")
+    payload = {
+        "prompt": prompt,
+        "width": width,
+        "height": height,
+        "duration": duration,
+        "fps": 16
+    }
+    with httpx.Client(timeout=240.0, follow_redirects=True) as client:
+        resp = client.post(f"{clean_url}/generate-video", json=payload)
+        resp.raise_for_status()
+        content_type = resp.headers.get("content-type", "")
+        if "video" in content_type or len(resp.content) > 10000:
+            return resp.content
+        data = resp.json()
+        if "video_base64" in data:
+            import base64
+            return base64.b64decode(data["video_base64"])
+        raise Exception(f"Colab video payload invalid: {data}")
+
+def generate_colab_image(colab_url: str, prompt: str, width: int = 1024, height: int = 1024, status_placeholder=None) -> bytes:
+    """Generates high-resolution visuals on user's Google Colab GPU and returns image bytes."""
+    clean_url = colab_url.strip().rstrip("/")
+    if not clean_url.startswith("http"):
+        clean_url = "https://" + clean_url
+    if status_placeholder:
+        status_placeholder.info(f"⚡ Connected to Colab GPU: Generating 1024x1024 diffusion visual on T4...")
+    payload = {"prompt": prompt, "width": width, "height": height}
+    with httpx.Client(timeout=120.0, follow_redirects=True) as client:
+        resp = client.post(f"{clean_url}/generate-image", json=payload)
+        resp.raise_for_status()
+        content_type = resp.headers.get("content-type", "")
+        if "image" in content_type or len(resp.content) > 10000:
+            return resp.content
+        data = resp.json()
+        if "image_base64" in data:
+            import base64
+            return base64.b64decode(data["image_base64"])
+        raise Exception(f"Colab image payload invalid: {data}")
 
 # ----------------- GITHUB & CLOUD DEPLOYMENT ENGINE -----------------
 def get_git_info() -> dict:
@@ -1099,6 +1318,18 @@ if "tab3_video_bytes" not in st.session_state:
     st.session_state.tab3_video_bytes = None
 if "tab3_video_caption" not in st.session_state:
     st.session_state.tab3_video_caption = None
+
+# Tab 3: Google Colab GPU Bridge State
+if "colab_tunnel_url" not in st.session_state:
+    st.session_state.colab_tunnel_url = ""
+if "colab_connected" not in st.session_state:
+    st.session_state.colab_connected = False
+if "colab_hardware_info" not in st.session_state:
+    st.session_state.colab_hardware_info = ""
+if "colab_latency" not in st.session_state:
+    st.session_state.colab_latency = ""
+if "tab3_hw_engine_selector" not in st.session_state:
+    st.session_state.tab3_hw_engine_selector = "☁️ Free Cloud Tier (Hugging Face ZeroGPU & Storyboard Synthesizer)"
 
 # Extra state for the redesigned UI
 if "last_latency" not in st.session_state:
@@ -1750,15 +1981,91 @@ with tab2:
 # TAB 3: FREE CLOUD IMAGE & VIDEO STUDIO
 # ===================================================
 with tab3:
-    tab_header("Free Cloud Media Studio",
+    tab_header("Free Cloud & Colab Media Studio",
                "Native 1024x1024 visuals and 5–30s multi-scene MP4 video. 100% free with 0% laptop GPU load.")
+
+    # ---- TOP-LEVEL HARDWARE ACCELERATION ENGINE SELECTOR ----
+    c_hw_radio, c_hw_badge = st.columns([1.25, 0.75], gap="medium")
+    with c_hw_radio:
+        hw_mode = st.radio(
+            "Hardware Acceleration Engine:",
+            [
+                "☁️ Free Cloud Tier (Hugging Face ZeroGPU & Storyboard Synthesizer)",
+                "⚡ Google Colab GPU Bridge (16GB Dedicated T4 GPU • True Video Diffusion)"
+            ],
+            key="tab3_hw_engine_selector",
+            horizontal=True
+        )
+    with c_hw_badge:
+        if st.session_state.colab_connected:
+            ui(f"""
+            <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 12px; padding: 10px 14px; margin-top: 1.4rem; display: flex; align-items: center; gap: 8px;">
+                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#10b981; box-shadow:0 0 10px #10b981; flex-shrink:0;"></span>
+                <span style="font-size:0.83rem; font-weight:600; color:#34d399; line-height:1.3;">🟢 Online: {esc(st.session_state.colab_hardware_info)} ({esc(st.session_state.colab_latency)})</span>
+            </div>
+            """)
+        else:
+            ui("""
+            <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 10px 14px; margin-top: 1.4rem; display: flex; align-items: center; gap: 8px;">
+                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#94a3b8; flex-shrink:0;"></span>
+                <span style="font-size:0.83rem; color:#94a3b8; line-height:1.3;">☁️ ZeroGPU Cloud Tier Active (0% Local GPU)</span>
+            </div>
+            """)
+
+    is_colab_selected = "Google Colab" in hw_mode
+
+    # ---- GOOGLE COLAB GPU BRIDGE DOCK (When Colab Engine is Selected) ----
+    if is_colab_selected:
+        with st.container(key="panel_colab_dock"):
+            panel_title("⚡", "Google Colab Dedicated GPU Bridge", "Connect a free 16GB NVIDIA Tesla T4 GPU for unlimited heavy diffusion and real fluid video.")
+
+            c_tun_input, c_tun_btn = st.columns([2.6, 1.4], gap="medium")
+            with c_tun_input:
+                colab_url_input = st.text_input(
+                    "Colab Public Endpoint URL (from Cloudflare Tunnel):",
+                    value=st.session_state.colab_tunnel_url,
+                    placeholder="https://your-tunnel-name.trycloudflare.com",
+                    key="tab3_colab_url_input",
+                    help="Paste the https://xxxx.trycloudflare.com link printed by your Google Colab notebook cell."
+                )
+            with c_tun_btn:
+                st.write("")
+                st.write("")
+                test_colab_btn = btn("⚡ Connect & Test Colab GPU", type="primary")
+
+            if test_colab_btn:
+                if not colab_url_input.strip():
+                    st.warning("Please paste your Colab trycloudflare.com URL first.")
+                else:
+                    with st.spinner("Pinging Colab GPU Bridge microservice..."):
+                        healthy, msg, lat = check_colab_health(colab_url_input)
+                        if healthy:
+                            st.session_state.colab_connected = True
+                            st.session_state.colab_tunnel_url = colab_url_input.strip()
+                            st.session_state.colab_hardware_info = msg
+                            st.session_state.colab_latency = lat
+                            st.success(f"🎉 Connected to Google Colab GPU: {msg} | Latency: {lat}")
+                            st.rerun()
+                        else:
+                            st.session_state.colab_connected = False
+                            st.error(f"❌ Failed to reach Colab GPU Bridge: {msg}. Check if your Colab cell is running.")
+
+            with st.expander("🚀 1-Click Google Colab Notebook Setup Guide & Runnable Cell", expanded=not st.session_state.colab_connected):
+                st.markdown("""
+                **Turn Google Colab into your private free 16GB AI server in 3 steps:**
+                1. Click the button below to open Google Colab in a new tab.
+                2. In Colab menu, select GPU: **Runtime -> Change runtime type -> T4 GPU**.
+                3. Paste the code below and run the cell (`Shift + Enter`). Copy the `trycloudflare.com` URL into AI Hub above!
+                """)
+                st.markdown("[👉 **Open Google Colab (Free T4 GPU)**](https://colab.research.google.com/)", unsafe_allow_html=True)
+                st.code(COLAB_SERVER_SNIPPET, language="python")
 
     img_col, vid_col = st.columns(2, gap="large")
 
-    # ---- Image ----
+    # ---- Image Studio ----
     with img_col:
         with st.container(key="panel_image"):
-            panel_title("✦", "Cloud Image Studio", "FLUX.1-schnell with automatic Stable Horde fallback, up to 1024x1024.")
+            panel_title("✦", "Cloud Image Studio", "FLUX.1-schnell & SDXL-Turbo up to 1024x1024.")
 
             st.selectbox(
                 "Image Style & Preset:",
@@ -1775,9 +2082,23 @@ with tab3:
 
             c_model, c_aspect = st.columns(2)
             with c_model:
+                if is_colab_selected and st.session_state.colab_connected:
+                    img_engines = [
+                        "⚡ Google Colab SDXL-Turbo (Dedicated 16GB GPU • 1024x1024)",
+                        "FLUX.1-schnell (Max 1024 Quality)",
+                        "Pollinations Cloud FLUX (Zero Token)",
+                        "Stable Diffusion (Fast Cloud)"
+                    ]
+                else:
+                    img_engines = [
+                        "FLUX.1-schnell (Max 1024 Quality)",
+                        "Pollinations Cloud FLUX (Zero Token)",
+                        "Stable Diffusion (Fast Cloud)"
+                    ]
+
                 model_choice = st.selectbox(
                     "Model Engine:",
-                    ["FLUX.1-schnell (Max 1024 Quality)", "Pollinations Cloud FLUX (Zero Token)", "Stable Diffusion (Fast)"],
+                    img_engines,
                     index=0,
                     key="tab3_model_choice"
                 )
@@ -1789,32 +2110,50 @@ with tab3:
                     key="tab3_aspect"
                 )
             w, h = IMG_DIMS[aspect]
-            use_flux = model_choice.startswith("FLUX")
 
-            ui(chips([f"<b>{w}×{h}</b> output", "FLUX.1-schnell" if use_flux else "Stable Horde"]))
+            if is_colab_selected and st.session_state.colab_connected and "Colab" in model_choice:
+                ui(chips([f"<b>{w}×{h}</b> output", "⚡ Colab 16GB T4 GPU", "0% Laptop GPU"]))
+                gen_img_btn = btn("⚡ Generate 1024x1024 Visual on Colab GPU", type="primary")
+            else:
+                use_flux = model_choice.startswith("FLUX")
+                ui(chips([f"<b>{w}×{h}</b> output", "FLUX.1-schnell" if use_flux else "Cloud Engine"]))
+                gen_img_btn = btn("✦ Generate Image in Cloud", type="primary")
 
-            gen_img_btn = btn("✦ Generate Image in Cloud", type="primary")
             img_status_box = st.empty()
 
             if gen_img_btn:
-                with st.spinner("Generating on cloud GPU cluster (0% laptop GPU load)..."):
-                    t0 = time.time()
-                    try:
-                        img_data = generate_cloud_image_flux_or_horde(
-                            img_prompt,
-                            width=w,
-                            height=h,
-                            hf_token=hf_token,
-                            engine_choice=model_choice,
-                            status_placeholder=img_status_box
-                        )
-                        elapsed = time.time() - t0
-                        img_status_box.success(f"Generated {w}x{h} visual in {elapsed:.1f} seconds!")
+                if is_colab_selected and "Colab" in model_choice and not st.session_state.colab_connected:
+                    img_status_box.warning("⚠️ Colab GPU Bridge is selected but not connected. Please paste your tunnel URL in the Colab dock above and click Connect, or switch hardware mode to Free Cloud Tier.")
+                else:
+                    with st.spinner("Generating visual (0% laptop GPU load)..."):
+                        t0 = time.time()
+                        try:
+                            if is_colab_selected and st.session_state.colab_connected and "Colab" in model_choice:
+                                img_data = generate_colab_image(
+                                    st.session_state.colab_tunnel_url,
+                                    img_prompt,
+                                    width=w,
+                                    height=h,
+                                    status_placeholder=img_status_box
+                                )
+                                engine_tag = "Colab Dedicated T4 GPU"
+                            else:
+                                img_data = generate_cloud_image_flux_or_horde(
+                                    img_prompt,
+                                    width=w,
+                                    height=h,
+                                    hf_token=hf_token,
+                                    engine_choice=model_choice,
+                                    status_placeholder=img_status_box
+                                )
+                                engine_tag = "Cloud GPU Cluster"
+                            elapsed = time.time() - t0
+                            img_status_box.success(f"Generated {w}x{h} visual via {engine_tag} in {elapsed:.1f} seconds!")
 
-                        st.session_state.tab3_image_bytes = img_data
-                        st.session_state.tab3_image_caption = f"Generated in {w}x{h} via Cloud GPU in {elapsed:.1f}s | Preserved across tabs"
-                    except Exception as e:
-                        img_status_box.error(f"Image Generation Error: {e}")
+                            st.session_state.tab3_image_bytes = img_data
+                            st.session_state.tab3_image_caption = f"Generated in {w}x{h} via {engine_tag} in {elapsed:.1f}s | Preserved across tabs"
+                        except Exception as e:
+                            img_status_box.error(f"Image Generation Error: {e}")
 
             if st.session_state.tab3_image_bytes:
                 gen_image = Image.open(io.BytesIO(st.session_state.tab3_image_bytes))
@@ -1825,7 +2164,7 @@ with tab3:
                     dl_btn(
                         label="↓ Download High-Res Image (.webp)",
                         data=st.session_state.tab3_image_bytes,
-                        file_name=f"cloud_visual_{int(time.time())}.webp",
+                        file_name=f"visual_{int(time.time())}.webp",
                         mime="image/webp"
                     )
                 with c_img_clear:
@@ -1834,10 +2173,10 @@ with tab3:
                         st.session_state.tab3_image_caption = None
                         st.rerun()
 
-    # ---- Video ----
+    # ---- Video Studio ----
     with vid_col:
         with st.container(key="panel_video"):
-            panel_title("▶", "Cloud Video Studio", "Multi-Scene Storyboard Director (20-30s Unlimited MP4) & LTX-Video Cloud.")
+            panel_title("▶", "Cloud Video Studio", "Multi-Scene Storyboard Director (20-30s Unlimited MP4) & Real Diffusion Motion.")
 
             st.selectbox(
                 "Video Style & Preset:",
@@ -1852,13 +2191,23 @@ with tab3:
                 height=105
             )
 
-            vid_engine = st.selectbox(
-                "Video Engine:",
-                [
+            if is_colab_selected and st.session_state.colab_connected:
+                vid_engines = [
+                    "⚡ Google Colab Diffusers MS-1.7B (True Spatio-Temporal Motion Diffusion)",
                     "Auto-Failover (ZeroGPU LTX Diffusion + Storyboard Fallback)",
                     "Lightricks LTX-Video (Cloud ZeroGPU True Spatio-Temporal Diffusion)",
                     "Multi-Scene Storyboard Director (10-30s Unlimited MP4)"
-                ],
+                ]
+            else:
+                vid_engines = [
+                    "Auto-Failover (ZeroGPU LTX Diffusion + Storyboard Fallback)",
+                    "Lightricks LTX-Video (Cloud ZeroGPU True Spatio-Temporal Diffusion)",
+                    "Multi-Scene Storyboard Director (10-30s Unlimited MP4)"
+                ]
+
+            vid_engine = st.selectbox(
+                "Video Engine:",
+                vid_engines,
                 index=0,
                 key="tab3_vid_engine"
             )
@@ -1874,54 +2223,87 @@ with tab3:
             vw, vh = VID_DIMS[vid_res_label]
 
             with c_vdur:
-                vid_dur_label = st.selectbox(
-                    "Video Duration:",
-                    [
-                        "2 Seconds (Lightricks LTX Diffusion • 2s Clip)",
-                        "4 Seconds (Lightricks LTX Diffusion • 4s Clip)",
-                        "10 Seconds (Storyboard Director • 2 Scenes)",
-                        "20 Seconds (Storyboard Director • 4 Scenes)",
-                        "30 Seconds (Storyboard Director • 6 Scenes)"
-                    ],
-                    index=0,
-                    key="tab3_vid_duration"
-                )
-            dur_val = int(vid_dur_label.split()[0])
+                if "Colab" in vid_engine:
+                    vid_dur_label = st.selectbox(
+                        "Video Duration:",
+                        [
+                            "16 Frames (~1.5s True 3D Diffusion Motion)",
+                            "24 Frames (~2.0s True 3D Diffusion Motion)",
+                            "32 Frames (~3.0s True 3D Diffusion Motion)"
+                        ],
+                        index=0,
+                        key="tab3_vid_duration_colab"
+                    )
+                    dur_val = int(vid_dur_label.split()[0]) // 8
+                else:
+                    vid_dur_label = st.selectbox(
+                        "Video Duration:",
+                        [
+                            "2 Seconds (Lightricks LTX Diffusion • 2s Clip)",
+                            "4 Seconds (Lightricks LTX Diffusion • 4s Clip)",
+                            "10 Seconds (Storyboard Director • 2 Scenes)",
+                            "20 Seconds (Storyboard Director • 4 Scenes)",
+                            "30 Seconds (Storyboard Director • 6 Scenes)"
+                        ],
+                        index=0,
+                        key="tab3_vid_duration"
+                    )
+                    dur_val = int(vid_dur_label.split()[0])
 
-            ui(chips([f"<b>{vw}×{vh}</b> output", f"<b>{dur_val}s</b> duration", "0% Laptop GPU"]))
+            if "Colab" in vid_engine and is_colab_selected and st.session_state.colab_connected:
+                ui(chips([f"<b>{vw}×{vh}</b> output", "⚡ Colab 16GB Dedicated GPU", "Real Spatio-Temporal Motion"]))
+                gen_vid_btn = btn("⚡ Synthesize Real Motion Video on Colab GPU", type="primary")
+            else:
+                ui(chips([f"<b>{vw}×{vh}</b> output", f"<b>{dur_val}s</b> duration", "0% Laptop GPU"]))
+                gen_vid_btn = btn("▶ Generate Video in Cloud", type="primary")
 
-            gen_vid_btn = btn("▶ Generate Video in Cloud", type="primary")
             vid_status_box = st.empty()
 
             if gen_vid_btn:
-                with st.spinner(f"Synthesizing {dur_val}s cinematic video in cloud (0% laptop GPU load)..."):
-                    t0 = time.time()
-                    try:
-                        if "Storyboard Director" in vid_engine and dur_val >= 10:
-                            vid_bytes = synthesize_multiscene_video(
-                                vid_prompt,
-                                width=vw,
-                                height=vh,
-                                total_duration=dur_val,
-                                hf_token=hf_token,
-                                status_placeholder=vid_status_box
-                            )
-                        else:
-                            vid_bytes = generate_cloud_video_ltx(
-                                prompt=vid_prompt,
-                                width=vw,
-                                height=vh,
-                                duration=dur_val,
-                                hf_token=hf_token,
-                                status_placeholder=vid_status_box
-                            )
-                        elapsed = time.time() - t0
-                        vid_status_box.success(f"Generated {dur_val}s ({vw}x{vh}) cinematic video in {elapsed:.1f} seconds!")
+                if is_colab_selected and "Colab" in vid_engine and not st.session_state.colab_connected:
+                    vid_status_box.warning("⚠️ Colab GPU Bridge is selected but not connected. Please paste your tunnel URL in the Colab dock above and click Connect, or switch hardware mode to Free Cloud Tier.")
+                else:
+                    with st.spinner("Synthesizing cinematic video (0% laptop GPU load)..."):
+                        t0 = time.time()
+                        try:
+                            if "Colab" in vid_engine and is_colab_selected and st.session_state.colab_connected:
+                                vid_bytes = generate_colab_video(
+                                    st.session_state.colab_tunnel_url,
+                                    vid_prompt,
+                                    width=vw,
+                                    height=vh,
+                                    duration=dur_val,
+                                    status_placeholder=vid_status_box
+                                )
+                                engine_tag = "Colab Dedicated T4 GPU (True Motion Diffusion)"
+                            elif "Storyboard Director" in vid_engine and dur_val >= 10:
+                                vid_bytes = synthesize_multiscene_video(
+                                    vid_prompt,
+                                    width=vw,
+                                    height=vh,
+                                    total_duration=dur_val,
+                                    hf_token=hf_token,
+                                    status_placeholder=vid_status_box
+                                )
+                                engine_tag = "Multi-Scene Storyboard Synthesizer"
+                            else:
+                                vid_bytes = generate_cloud_video_ltx(
+                                    prompt=vid_prompt,
+                                    width=vw,
+                                    height=vh,
+                                    duration=dur_val,
+                                    hf_token=hf_token,
+                                    status_placeholder=vid_status_box
+                                )
+                                engine_tag = "Lightricks LTX-Video Cloud ZeroGPU"
 
-                        st.session_state.tab3_video_bytes = vid_bytes
-                        st.session_state.tab3_video_caption = f"Generated {dur_val}s {vw}x{vh} clip via Cloud in {elapsed:.1f}s | Preserved across tabs"
-                    except Exception as e:
-                        vid_status_box.error(f"Video Generation Error: {e}")
+                            elapsed = time.time() - t0
+                            vid_status_box.success(f"Generated ({vw}x{vh}) cinematic video via {engine_tag} in {elapsed:.1f} seconds!")
+
+                            st.session_state.tab3_video_bytes = vid_bytes
+                            st.session_state.tab3_video_caption = f"Generated {vw}x{vh} clip via {engine_tag} in {elapsed:.1f}s | Preserved across tabs"
+                        except Exception as e:
+                            vid_status_box.error(f"Video Generation Error: {e}")
 
             if st.session_state.tab3_video_bytes:
                 st.video(st.session_state.tab3_video_bytes)
@@ -1948,50 +2330,6 @@ with tab3:
                 * **[Wan 2.1 Space (Hugging Face ZeroGPU)](https://huggingface.co/spaces/Wan-AI/Wan2.1):** 14B diffusion model running on cloud H100s.
                 * **[PixVerse AI](https://pixverse.ai/):** Cinematic pans, 4K rendering, and free daily credits.
                 """)
-
-            with st.expander("⚡ Google Colab GPU Bridge (Free Heavy GPU Compute)", expanded=False):
-                st.markdown("""
-                Connect a free **16GB NVIDIA T4 / A100 GPU on Google Colab** to synthesize unlimited heavy 1024x1024 FLUX visuals and multi-minute videos with zero local hardware load.
-                """)
-                colab_url = st.text_input(
-                    "Colab Public Tunnel URL (from Cloudflare or ngrok):",
-                    placeholder="https://xxxx.trycloudflare.com",
-                    key="tab3_colab_tunnel_url"
-                )
-                if colab_url:
-                    st.success(f"Connected to Colab GPU Bridge: `{colab_url}`")
-                
-                st.markdown("##### 🚀 1-Click Google Colab Notebook Setup")
-                st.caption("Open Google Colab, change runtime to **T4 GPU**, paste this snippet and run it:")
-                st.code("""
-# 1. Install dependencies in Google Colab
-!pip install -q fastapi uvicorn diffusers transformers accelerate torch pyngrok
-
-# 2. Install Cloudflare Tunnel
-!wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-!dpkg -i cloudflared-linux-amd64.deb
-
-# 3. Start lightweight GPU inference server
-import subprocess, time
-
-code = '''
-from fastapi import FastAPI
-import torch
-
-app = FastAPI()
-
-@app.get("/health")
-def health():
-    return {"status": "ok", "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"}
-'''
-with open("colab_server.py", "w") as f:
-    f.write(code)
-
-proc = subprocess.Popen(["uvicorn", "colab_server:app", "--port", "8000"])
-time.sleep(2)
-tunnel = subprocess.Popen(["cloudflared", "tunnel", "--url", "http://localhost:8000"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-print("GPU Server running! Look for the trycloudflare.com link in cloudflared logs and paste it into AI Hub.")
-                """, language="python")
 
 # ===================================================
 # TAB 4: DEPLOYMENT & FREE AI GUIDE
