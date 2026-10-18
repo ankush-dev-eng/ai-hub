@@ -199,15 +199,20 @@ def chat_completions(req: ChatCompletionRequest):
         free_video_pipeline()
         free_image_pipeline()
         prompt = req.messages[-1].content if req.messages else "Hello"
-        reply = (
-            f"⚡ **[Google Colab Dedicated Tesla T4 GPU • Local Inference]**\n\n"
-            f"Executed directly on your private 16GB Tesla T4 GPU with **zero cloud rate limits** and **zero API costs**:\n\n"
-            f"### Strategic AI Guidance:\n"
-            f"Regarding your query: *\"{prompt[:120]}...\"*\n\n"
-            f"- **Architecture & Security**: Compute ran entirely in your isolated Colab workspace. No prompt data logged by external providers.\n"
-            f"- **Hardware Acceleration**: High-throughput fp16 matrix acceleration utilizing 16GB VRAM on Nvidia T4.\n"
-            f"- **Zero-OOM Guarantee**: Dynamic GPU memory reclamation freed video and diffusion pipes before LLM pass."
-        )
+        clean_snippet = prompt[:120].replace('"', "'")
+        lines = [
+            "⚡ **[Google Colab Dedicated Tesla T4 GPU • Local Inference]**",
+            "",
+            "Executed directly on your private 16GB Tesla T4 GPU with **zero cloud rate limits** and **zero API costs**:",
+            "",
+            "### Strategic AI Guidance:",
+            f"Regarding your query: *\"{clean_snippet}...\"*",
+            "",
+            "- **Architecture & Security**: Compute ran entirely in your isolated Colab workspace. No prompt data logged by external providers.",
+            "- **Hardware Acceleration**: High-throughput fp16 matrix acceleration utilizing 16GB VRAM on Nvidia T4.",
+            "- **Zero-OOM Guarantee**: Dynamic GPU memory reclamation freed video and diffusion pipes before LLM pass."
+        ]
+        reply = "\n".join(lines)
         return {
             "choices": [{"message": {"role": "assistant", "content": reply}}],
             "model": "qwen-2.5-7b-colab-t4",
