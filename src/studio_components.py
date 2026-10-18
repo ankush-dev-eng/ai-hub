@@ -14,28 +14,27 @@ def fx_flags(lite: bool) -> str:
     return f'<span id="fx-flags" data-lite="{1 if lite else 0}" hidden></span>'
 
 def brand_html() -> str:
-    """Authentic isometric glyph and typography for sidebar."""
+    """Authentic cyberpunk anime mecha emblem and typography for sidebar."""
     return """
     <div class="brand">
       <div class="brand-mark">
-        <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M16 2L3 8.5L16 15L29 8.5L16 2Z" fill="url(#brandGrad1)" stroke="#38bdf8" stroke-width="1.2"/>
-          <path d="M3 14L16 20.5L29 14" stroke="url(#brandGrad2)" stroke-width="1.8" stroke-linecap="round"/>
-          <path d="M3 19.5L16 26L29 19.5" stroke="url(#brandGrad3)" stroke-width="2.2" stroke-linecap="round"/>
-          <defs>
-            <linearGradient id="brandGrad1" x1="3" y1="2" x2="29" y2="15" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#6366f1" stop-opacity="0.85"/>
-              <stop offset="1" stop-color="#06b6d4" stop-opacity="0.95"/>
-            </linearGradient>
-            <linearGradient id="brandGrad2" x1="3" y1="14" x2="29" y2="20.5" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#818cf8"/>
-              <stop offset="1" stop-color="#38bdf8"/>
-            </linearGradient>
-            <linearGradient id="brandGrad3" x1="3" y1="19.5" x2="29" y2="26" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#a855f7"/>
-              <stop offset="1" stop-color="#6366f1"/>
-            </linearGradient>
-          </defs>
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Cyber Hex Shield -->
+          <polygon points="16,2 30,9 30,23 16,30 2,23 2,9" fill="#0b0e18" stroke="#6366f1" stroke-width="1.5"/>
+          <!-- Mecha Crown V-Fin -->
+          <polygon points="16,6 10,2 9,4 15,8" fill="#f43f5e"/>
+          <polygon points="16,6 22,2 23,4 17,8" fill="#f43f5e"/>
+          <!-- Core Power Gem -->
+          <polygon points="16,7 18,9 18,11 16,13 14,11 14,9" fill="#22d3ee" stroke="#ffffff" stroke-width="0.8"/>
+          <!-- Slanted Anime Visor Eyes -->
+          <polygon points="9,14 14,15 13.5,17 9.5,16" fill="#22d3ee"/>
+          <polygon points="23,14 18,15 18.5,17 22.5,16" fill="#22d3ee"/>
+          <!-- Mecha Faceplate & Slits -->
+          <polygon points="11,18 21,18 19,25 16,27 13,25" fill="#151928" stroke="#818cf8" stroke-width="0.8"/>
+          <line x1="14" y1="20" x2="18" y2="20" stroke="#22d3ee" stroke-width="0.8"/>
+          <line x1="14.5" y1="22" x2="17.5" y2="22" stroke="#6366f1" stroke-width="0.8"/>
+          <!-- Chin Accent -->
+          <polygon points="15,26 17,26 16,28.5" fill="#f43f5e"/>
         </svg>
       </div>
       <div>

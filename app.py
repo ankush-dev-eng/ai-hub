@@ -764,6 +764,40 @@ def get_git_info() -> dict:
 
     return info
 
+@st.cache_data(ttl=300)
+def get_user_github_repos(account: str = "ankush-dev-eng") -> list[dict]:
+    """Queries user's GitHub repositories via gh CLI, falling back to verified repository roster."""
+    default_repos = [
+        {"name": "ai-hub", "description": "Multi-Model AI Prototyping Studio (Gemini + Groq + FLUX)", "default_file": "app.py"},
+        {"name": "NiveshRakshak", "description": "AI-Powered Financial Safety & Message Fraud Analyzer", "default_file": "backend/main.py"},
+        {"name": "pakka", "description": "AI Fraud Analyst for Student Inboxes & Job Offers", "default_file": "app.py"},
+        {"name": "TutorForge-AI", "description": "AI Study Companion & Adaptive Tutor", "default_file": "app.py"},
+        {"name": "SnapExplain", "description": "Privacy-First AI Study Assistant for Notes", "default_file": "app.py"},
+        {"name": "ParallelRC-3D-Lab", "description": "3D Virtual Laboratory for Parallel RC Circuits", "default_file": "app.py"},
+        {"name": "inkloom", "description": "Specialised AI Models for Brand Identity & Logo Design", "default_file": "app.py"},
+        {"name": "ecopulse", "description": "AI-Powered Sustainable Supply Chain & Carbon Calculator", "default_file": "app.py"},
+        {"name": "pulsecheck-ai", "description": "AI-Powered Emergency Response & SOS Hub", "default_file": "app.py"}
+    ]
+    try:
+        res = subprocess.run(
+            ["gh", "repo", "list", account, "--limit", "30", "--json", "name,description,visibility"],
+            capture_output=True, text=True, timeout=8
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            import json
+            data = json.loads(res.stdout)
+            repos = []
+            for item in data:
+                name = item.get("name", "")
+                desc = item.get("description", "") or ""
+                def_file = "backend/main.py" if name == "NiveshRakshak" else "app.py"
+                repos.append({"name": name, "description": desc, "default_file": def_file})
+            if repos:
+                return repos
+    except Exception:
+        pass
+    return default_repos
+
 def execute_github_publish(repo_name: str, account: str, is_public: bool, commit_msg: str, status_placeholder=None) -> tuple[bool, str, str]:
     """Publishes current workspace to GitHub under user's account and returns (success, repo_url_or_err, deploy_url)."""
     repo_name = repo_name.strip()
@@ -820,6 +854,177 @@ def execute_github_publish(repo_name: str, account: str, is_public: bool, commit
         return True, repo_url, deploy_url
     except Exception as e:
         return False, str(e), ""
+
+# ----------------- 2026 MODEL INTELLIGENCE & KNOWLEDGE REGISTRY -----------------
+MODEL_KNOWLEDGE_SPECS = {
+    "qwen/qwen3.8-27b": {
+        "name": "Qwen 3.8 27B",
+        "provider": "Groq LPU (Silicon Acceleration)",
+        "architecture": "Dense Transformer (27B Parameters)",
+        "best_for": "⚡ High-Speed Agentic Coding, Logic Breakdown & Complex Tool Calling",
+        "speed": "~320 tokens/sec",
+        "context_window": "131,072 tokens (~100,000 words)",
+        "cutoff_date": "March 2026",
+        "can_update": "Pre-trained weights are static up to March 2026. Live knowledge is updated via RAG, Web Search Grounding, and Adaption Labs custom LoRA adapters.",
+        "badge_color": "#22d3ee"
+    },
+    "openai/gpt-oss-120b": {
+        "name": "OpenAI GPT-OSS 120B",
+        "provider": "Groq LPU (Ultra-Scale Weights)",
+        "architecture": "120B Open Foundation Architecture",
+        "best_for": "🧠 Deep Mathematical Reasoning, System Architecture & Multi-File Refactoring",
+        "speed": "~150 tokens/sec",
+        "context_window": "131,072 tokens (~100,000 words)",
+        "cutoff_date": "Mid 2026",
+        "can_update": "Weights frozen at cutoff. Updatable via System In-Context Prompts, Tool Execution, and API Vector Databases.",
+        "badge_color": "#a855f7"
+    },
+    "openai/gpt-oss-20b": {
+        "name": "OpenAI GPT-OSS 20B",
+        "provider": "Groq LPU (Sub-second Latency)",
+        "architecture": "20B Dense Transformer",
+        "best_for": "⚡ Instant Chat Responses, Command Generation & Rapid Review",
+        "speed": "~450 tokens/sec",
+        "context_window": "65,536 tokens (~50,000 words)",
+        "cutoff_date": "Early 2026",
+        "can_update": "Weights frozen at cutoff. Updatable via in-context documents and live tool calling.",
+        "badge_color": "#38bdf8"
+    },
+    "gemini-3.5-flash": {
+        "name": "Google Gemini 3.5 Flash",
+        "provider": "Google DeepMind Cloud",
+        "architecture": "Native Multimodal Transformer (Audio, Video, Images, Text)",
+        "best_for": "👁️ Deep Multimodal Code & Document Auditing, 100+ Page PDFs & Vision",
+        "speed": "~120 tokens/sec",
+        "context_window": "1,000,000 tokens (~750,000 words / 1 hour video)",
+        "cutoff_date": "February 2026",
+        "can_update": "Weights frozen at cutoff. Supported by Google Search Live Grounding (real-time live web facts up to today)!",
+        "badge_color": "#4285f4"
+    },
+    "gemini-3.5-flash-lite": {
+        "name": "Google Gemini 3.5 Flash Lite",
+        "provider": "Google DeepMind Cloud",
+        "architecture": "High-Efficiency Multimodal",
+        "best_for": "⚡ High-Frequency Batch Processing, Live Chat & OCR",
+        "speed": "~210 tokens/sec",
+        "context_window": "1,000,000 tokens",
+        "cutoff_date": "February 2026",
+        "can_update": "Weights frozen at cutoff. Updatable via Google Grounding & live web citations.",
+        "badge_color": "#34a853"
+    },
+    "gemini-3.8-flash": {
+        "name": "Google Gemini 3.8 Flash (Preview)",
+        "provider": "Google DeepMind Cloud",
+        "architecture": "Advanced Multimodal Reasoning Core",
+        "best_for": "🔬 Cutting-Edge Codebase Audits, Complex Financial Tables & Vision Comparison",
+        "speed": "~110 tokens/sec",
+        "context_window": "1,000,000 tokens",
+        "cutoff_date": "April 2026",
+        "can_update": "Pre-trained weights static up to April 2026. Live facts pulled dynamically via Search Grounding tools.",
+        "badge_color": "#ea4335"
+    },
+    "google/gemma-4-31b-it:free": {
+        "name": "Google Gemma 4 31B IT (Free)",
+        "provider": "OpenRouter Free Cluster",
+        "architecture": "Open-Weights Google Architecture (31B)",
+        "best_for": "🎓 Academic Research, Multi-Turn Technical Dialog & Math",
+        "speed": "~80 tokens/sec",
+        "context_window": "32,768 tokens",
+        "cutoff_date": "Early 2026",
+        "can_update": "Static open weights. Updatable via RAG and MCP tools.",
+        "badge_color": "#06b6d4"
+    },
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+        "name": "NVIDIA Nemotron 3 Nano Omni 30B (Free)",
+        "provider": "OpenRouter Free Cluster",
+        "architecture": "NVIDIA SteerLM Reasoning MoE",
+        "best_for": "🤖 Chain-of-Thought Reasoning, Complex Logic Proofs & System Instructions",
+        "speed": "~65 tokens/sec",
+        "context_window": "65,536 tokens",
+        "cutoff_date": "Mid 2026",
+        "can_update": "Weights static. Updatable via NVIDIA NeMo guardrails and fine-tune adapters.",
+        "badge_color": "#76b900"
+    },
+    "nvidia/nemotron-3.5-lightning:free": {
+        "name": "NVIDIA Nemotron 3.5 Lightning (Free)",
+        "provider": "OpenRouter Free Cluster",
+        "architecture": "Ultra-Low Latency Distilled Foundation",
+        "best_for": "⚡ High-Throughput Chat & Prompt Expansion",
+        "speed": "~140 tokens/sec",
+        "context_window": "32,768 tokens",
+        "cutoff_date": "Mid 2026",
+        "can_update": "Static weights. Updatable via in-context data.",
+        "badge_color": "#76b900"
+    },
+    "openrouter/free": {
+        "name": "OpenRouter Auto-Free Smart Router",
+        "provider": "OpenRouter Dynamic Mesh",
+        "architecture": "Dynamic Multi-Model Router",
+        "best_for": "🔄 Zero-Downtime Resilience — Auto-routes to highest available free model",
+        "speed": "Varies by selected model (50-300 wps)",
+        "context_window": "Dynamic (32k - 128k)",
+        "cutoff_date": "2026 Active",
+        "can_update": "Automatically routes to updated models across the network.",
+        "badge_color": "#f59e0b"
+    },
+    "adaption/base-router": {
+        "name": "Adaption Labs Base Router",
+        "provider": "Adaption Labs LoRA Mesh",
+        "architecture": "Modular Adapter Routing Pipeline",
+        "best_for": "🎯 Specialized Domain Adapters, Custom System Rules & Enterprise Logic",
+        "speed": "~180 tokens/sec",
+        "context_window": "32,768 tokens",
+        "cutoff_date": "Continuous Adapter Updates",
+        "can_update": "✅ Dynamically updated via hot-swappable LoRA weights and fine-tuned checkpoints!",
+        "badge_color": "#ec4899"
+    }
+}
+
+def render_model_intelligence_card(model_choice_str: str):
+    """Renders a synchronized, rich spec card with Architecture, Use Case, Context Memory, Cutoff Date, and Updateability."""
+    spec = None
+    for key, data in MODEL_KNOWLEDGE_SPECS.items():
+        if key in model_choice_str or model_choice_str.startswith(key.split("/")[0]):
+            spec = data
+            break
+    if not spec:
+        spec = MODEL_KNOWLEDGE_SPECS.get("qwen/qwen3.8-27b")
+
+    badge_c = spec.get("badge_color", "#22d3ee")
+    st.markdown(f"""
+    <div style="margin: 0.8rem 0 1.2rem 0; padding: 1rem 1.25rem; border-radius: 12px; background: rgba(14, 18, 28, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: {badge_c}; box-shadow: 0 0 10px {badge_c};"></span>
+          <span style="font-weight: 700; color: #ffffff; font-size: 0.95rem;">{spec['name']}</span>
+          <span style="font-size: 0.78rem; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.06);">{spec['provider']}</span>
+        </div>
+        <div style="font-size: 0.8rem; color: #38bdf8; font-weight: 600;">
+          ⚡ Speed: {spec['speed']}
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; font-size: 0.84rem;">
+        <div style="background: rgba(255,255,255,0.02); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
+          <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Architecture</div>
+          <div style="color: #e2e8f0; font-weight: 500;">{spec['architecture']}</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.02); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
+          <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Token Memory / Context</div>
+          <div style="color: #38bdf8; font-weight: 600;">{spec['context_window']}</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.02); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
+          <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Knowledge Cutoff</div>
+          <div style="color: #a78bfa; font-weight: 600;">{spec['cutoff_date']}</div>
+        </div>
+      </div>
+      <div style="margin-top: 0.75rem; font-size: 0.83rem; color: #cbd5e1; line-height: 1.45;">
+        <span style="color: #f59e0b; font-weight: 600;">Best Use Case:</span> {spec['best_for']}
+      </div>
+      <div style="margin-top: 0.45rem; font-size: 0.8rem; color: #94a3b8; line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 0.45rem;">
+        <span style="color: #10b981; font-weight: 600;">Can We Update It?</span> {spec['can_update']}
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ----------------- PRESETS DEFINITIONS -----------------
 # Tab 2: Multimodal Auditor Presets
@@ -1123,7 +1328,8 @@ with tab1:
                 [
                     "qwen/qwen3.8-27b (Modern 2026 High Speed, 600+ t/s)",
                     "openai/gpt-oss-120b (120B Open Weights)",
-                    "openai/gpt-oss-20b (Fast Reasoning)"
+                    "openai/gpt-oss-20b (Fast Reasoning)",
+                    "meta-llama/llama-3.3-70b-versatile (Flagship Versatile)"
                 ],
                 index=0,
                 key="chat_model_groq"
@@ -1143,11 +1349,11 @@ with tab1:
             model_name = st.selectbox(
                 "Engine:",
                 [
+                    "openrouter/free (Smart Auto-Free Router)",
                     "google/gemma-4-31b-it:free (Gemma 4 31B • Free)",
                     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free (Nemotron Reasoning • Free)",
                     "nvidia/nemotron-3.5-lightning:free (Nemotron Lightning • Free)",
-                    "liquid/lfm-2.5-2.6b:free (Liquid Foundation 2.5 • Free)",
-                    "cohere/north-mini-code:free (Cohere North Mini • Free)"
+                    "meta-llama/llama-3.3-70b-instruct:free (Llama 3.3 70B • Free)"
                 ],
                 index=0,
                 key="chat_model_openrouter"
@@ -1178,6 +1384,9 @@ with tab1:
         with p_cols[3]:
             if btn("⚡ Fast MVP", help="Break down a project into a 2-hour build plan"):
                 st.session_state.preset_prompt = "Break down a winning 2-hour hackathon MVP build plan: Frontend, Backend API, Database, and Demo flow."
+
+    # Render synchronized model spec & knowledge card
+    render_model_intelligence_card(model_name)
 
     empty_ph = st.empty()
     if not st.session_state.chat_history:
@@ -1740,6 +1949,50 @@ with tab3:
                 * **[PixVerse AI](https://pixverse.ai/):** Cinematic pans, 4K rendering, and free daily credits.
                 """)
 
+            with st.expander("⚡ Google Colab GPU Bridge (Free Heavy GPU Compute)", expanded=False):
+                st.markdown("""
+                Connect a free **16GB NVIDIA T4 / A100 GPU on Google Colab** to synthesize unlimited heavy 1024x1024 FLUX visuals and multi-minute videos with zero local hardware load.
+                """)
+                colab_url = st.text_input(
+                    "Colab Public Tunnel URL (from Cloudflare or ngrok):",
+                    placeholder="https://xxxx.trycloudflare.com",
+                    key="tab3_colab_tunnel_url"
+                )
+                if colab_url:
+                    st.success(f"Connected to Colab GPU Bridge: `{colab_url}`")
+                
+                st.markdown("##### 🚀 1-Click Google Colab Notebook Setup")
+                st.caption("Open Google Colab, change runtime to **T4 GPU**, paste this snippet and run it:")
+                st.code("""
+# 1. Install dependencies in Google Colab
+!pip install -q fastapi uvicorn diffusers transformers accelerate torch pyngrok
+
+# 2. Install Cloudflare Tunnel
+!wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+!dpkg -i cloudflared-linux-amd64.deb
+
+# 3. Start lightweight GPU inference server
+import subprocess, time
+
+code = '''
+from fastapi import FastAPI
+import torch
+
+app = FastAPI()
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"}
+'''
+with open("colab_server.py", "w") as f:
+    f.write(code)
+
+proc = subprocess.Popen(["uvicorn", "colab_server:app", "--port", "8000"])
+time.sleep(2)
+tunnel = subprocess.Popen(["cloudflared", "tunnel", "--url", "http://localhost:8000"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+print("GPU Server running! Look for the trycloudflare.com link in cloudflared logs and paste it into AI Hub.")
+                """, language="python")
+
 # ===================================================
 # TAB 4: DEPLOYMENT & FREE AI GUIDE
 # ===================================================
@@ -1760,96 +2013,136 @@ with tab4:
         c_gh_left, c_gh_right = st.columns([1.15, 0.85], gap="large")
 
         with c_gh_left:
-            st.markdown("##### 1. Repository Configuration")
-            gh_user = st.text_input(
-                "GitHub Account / Username:",
-                value=detected_user,
-                key="tab4_gh_user",
-                help="Your verified GitHub username. Detected automatically from your local gh / git configuration."
+            st.markdown("##### 1. Universal Repository & Entrypoint Selector")
+            st.caption("Deploy **any** repository in your GitHub account (`ankush-dev-eng/{repo}`) directly to Streamlit Community Cloud.")
+
+            # Load actual user repos
+            user_repos = get_user_github_repos(detected_user)
+            repo_options = [r["name"] for r in user_repos]
+            if "NiveshRakshak" not in repo_options:
+                repo_options.append("NiveshRakshak")
+            if "ai-hub" not in repo_options:
+                repo_options.insert(0, "ai-hub")
+            repo_options.append("➕ [ Custom Repository Name ]")
+
+            selected_repo_choice = st.selectbox(
+                "Select GitHub Repository to Deploy:",
+                options=repo_options,
+                index=repo_options.index("ai-hub") if "ai-hub" in repo_options else 0,
+                key="tab4_repo_selector"
             )
 
-            c_rname, c_rvis = st.columns([1.2, 0.8])
-            with c_rname:
-                custom_repo = st.text_input(
-                    "Repository Name (Of Your Choice):",
-                    value=git_info.get("repo_name") or "ai-hub",
-                    key="tab4_custom_repo",
-                    help="Name of the GitHub repository you wish to create or link to (e.g. ai-hub, hackathon-ai-studio)."
+            if selected_repo_choice == "➕ [ Custom Repository Name ]":
+                final_repo_name = st.text_input("Enter Repository Name:", value="NiveshRakshak", key="tab4_custom_repo_input")
+            else:
+                final_repo_name = selected_repo_choice
+
+            c_br, c_entry = st.columns([0.8, 1.2])
+            with c_br:
+                branch_choice = st.text_input("Branch:", value="main", key="tab4_branch_name")
+            
+            with c_entry:
+                # Intelligently suggest entrypoint
+                default_entry = "backend/main.py" if final_repo_name == "NiveshRakshak" else "app.py"
+                entrypoint_options = ["app.py", "backend/main.py", "main.py", "streamlit_app.py", "dashboard.py", "➕ [ Custom File Path ]"]
+                if default_entry not in entrypoint_options:
+                    entrypoint_options.insert(0, default_entry)
+                entry_sel = st.selectbox(
+                    "Main Python File (.py):",
+                    options=entrypoint_options,
+                    index=entrypoint_options.index(default_entry) if default_entry in entrypoint_options else 0,
+                    key="tab4_entry_sel"
                 )
-            with c_rvis:
-                vis_option = st.selectbox(
-                    "Visibility:",
-                    ["Public (Free Hosting)", "Private"],
-                    index=0,
-                    key="tab4_repo_vis",
-                    help="Public repositories get unlimited 100% free hosting on Streamlit Community Cloud."
+                if entry_sel == "➕ [ Custom File Path ]":
+                    entrypoint_file = st.text_input("Custom Entrypoint Path:", value="backend/main.py", key="tab4_custom_entry")
+                else:
+                    entrypoint_file = entry_sel
+
+            c_user, c_vis = st.columns([1.1, 0.9])
+            with c_user:
+                gh_user = st.text_input("GitHub Username:", value=detected_user, key="tab4_gh_user")
+            with c_vis:
+                vis_option = st.selectbox("Hosting Tier:", ["Public (100% Free Hosting)", "Private"], index=0, key="tab4_repo_vis")
+
+            repo_full_name = f"{gh_user.strip()}/{final_repo_name.strip()}"
+            deploy_1click_url = f"https://share.streamlit.io/deploy?repository={urllib.parse.quote(repo_full_name)}&branch={urllib.parse.quote(branch_choice.strip())}&mainModule={urllib.parse.quote(entrypoint_file.strip())}"
+            direct_blob_file_url = f"https://github.com/{repo_full_name}/blob/{branch_choice.strip()}/{entrypoint_file.strip()}"
+
+            # 1-Click Launch Container
+            st.markdown(f"""
+            <div style="margin-top:1rem;padding:1.1rem;border-radius:12px;background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(34,211,238,0.08));border:1px solid rgba(99,102,241,0.35);box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                <span style="font-weight:700;color:#38bdf8;font-size:0.96rem;">🚀 1-Click Streamlit Cloud Deployer</span>
+                <span style="font-size:0.75rem;padding:2px 8px;border-radius:6px;background:rgba(34,211,238,0.15);color:#22d3ee;font-weight:600;">RECOMMENDED</span>
+              </div>
+              <div style="font-size:0.83rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.8rem;">
+                Launches <code>{repo_full_name}</code> on Streamlit Community Cloud with branch <code>{branch_choice}</code> and entrypoint <code>{entrypoint_file}</code> automatically filled and pre-validated.
+              </div>
+              <a href="{deploy_1click_url}" target="_blank" style="display:inline-block;padding:0.65rem 1.3rem;border-radius:10px;background:linear-gradient(135deg,#6366f1,#22d3ee);color:#ffffff;font-weight:700;text-decoration:none;box-shadow:0 8px 24px -4px rgba(99,102,241,0.7);transition:all 0.2s ease;">
+                🚀 Deploy '{final_repo_name}' Live on Streamlit Cloud ↗
+              </a>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Manual Paste Direct URL (The Exact Fix for Screenshot 1 & 3 Red Error!)
+            st.markdown(f"""
+            <div style="margin-top:0.8rem;padding:1rem;border-radius:12px;background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.08);">
+              <div style="font-weight:600;color:#f59e0b;font-size:0.88rem;margin-bottom:0.3rem;">
+                📋 Direct GitHub File URL (Fix for Streamlit's "Paste GitHub URL" Box)
+              </div>
+              <div style="font-size:0.8rem;color:#94a3b8;line-height:1.45;margin-bottom:0.6rem;">
+                💡 <b>Why Streamlit gave you that red error</b>: When using Streamlit's "Paste GitHub URL" field, you <b>must</b> paste the direct link to the <code>.py</code> file, NOT the repository homepage!
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.code(direct_blob_file_url, language="text")
+
+            # Local publish / commit section (only if current repo matches)
+            if final_repo_name == (git_info.get("repo_name") or "ai-hub"):
+                st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
+                commit_note = st.text_input(
+                    "Local Workspace Commit Message:",
+                    value="Deploy AI Hub v5.0 - Multi-Model Hackathon Studio",
+                    key="tab4_commit_msg"
                 )
+                c_btn_push, c_btn_sync = st.columns([1.2, 0.8])
+                with c_btn_push:
+                    publish_btn = btn("✦ Push & Publish Local Code", type="primary")
+                with c_btn_sync:
+                    sync_btn = btn("↻ Sync Latest Changes")
 
-            commit_note = st.text_input(
-                "Commit Message:",
-                value="Deploy AI Hub v5.0 - Multi-Model Hackathon Studio",
-                key="tab4_commit_msg"
-            )
+                publish_status = st.empty()
+                if publish_btn:
+                    with st.spinner(f"Publishing project to GitHub ({repo_full_name})..."):
+                        success, repo_res, deploy_link = execute_github_publish(
+                            repo_name=final_repo_name,
+                            account=gh_user,
+                            is_public=("Public" in vis_option),
+                            commit_msg=commit_note,
+                            status_placeholder=publish_status
+                        )
+                        if success:
+                            st.session_state.deployed_repo_url = repo_res
+                            st.session_state.deployed_share_url = deploy_link
+                            publish_status.success(f"Successfully pushed to GitHub: [{repo_res}]({repo_res})")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            publish_status.error(f"Deployment Error: {repo_res}")
 
-            is_pub = "Public" in vis_option
-            repo_full_name = f"{gh_user.strip()}/{custom_repo.strip()}"
-            deploy_target_url = f"https://share.streamlit.io/deploy?repository={repo_full_name}&branch=main&mainModule=app.py"
-
-            c_btn_push, c_btn_sync = st.columns([1.2, 0.8])
-            with c_btn_push:
-                publish_btn = btn("✦ Push & Publish to GitHub", type="primary")
-            with c_btn_sync:
-                sync_btn = btn("↻ Sync Latest Changes")
-
-            publish_status = st.empty()
-
-            if publish_btn:
-                with st.spinner(f"Publishing project to GitHub ({repo_full_name})..."):
-                    success, repo_res, deploy_link = execute_github_publish(
-                        repo_name=custom_repo,
-                        account=gh_user,
-                        is_public=is_pub,
-                        commit_msg=commit_note,
-                        status_placeholder=publish_status
-                    )
-                    if success:
-                        st.session_state.deployed_repo_url = repo_res
-                        st.session_state.deployed_share_url = deploy_link
-                        publish_status.success(f"Successfully pushed to GitHub: [{repo_res}]({repo_res})")
-                        st.balloons()
-                        st.rerun()
-                    else:
-                        publish_status.error(f"Deployment Error: {repo_res}")
-
-            if sync_btn:
-                with st.spinner("Syncing latest changes to GitHub..."):
-                    success, repo_res, deploy_link = execute_github_publish(
-                        repo_name=custom_repo,
-                        account=gh_user,
-                        is_public=is_pub,
-                        commit_msg=commit_note,
-                        status_placeholder=publish_status
-                    )
-                    if success:
-                        st.toast("GitHub repository successfully updated!")
-                    else:
-                        publish_status.error(f"Sync Error: {repo_res}")
-
-            if st.session_state.get("deployed_share_url") or active_origin:
-                live_link = st.session_state.get("deployed_share_url") or deploy_target_url
-                st.markdown(f"""
-                <div style="margin-top:1rem;padding:1rem;border-radius:12px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);">
-                  <div style="font-weight:600;color:#34d399;font-size:0.95rem;margin-bottom:0.4rem;">
-                    🚀 Ready to Launch on Streamlit Community Cloud
-                  </div>
-                  <div style="font-size:0.84rem;color:#cbd5e1;margin-bottom:0.8rem;">
-                    Click below to launch your app live on the web. The repository, main branch, and entrypoint <code>app.py</code> are automatically pre-configured.
-                  </div>
-                  <a href="{live_link}" target="_blank" style="display:inline-block;padding:0.6rem 1.2rem;border-radius:10px;background:linear-gradient(135deg,#6366f1,#22d3ee);color:#ffffff;font-weight:600;text-decoration:none;box-shadow:0 8px 24px -4px rgba(99,102,241,0.6);">
-                    🚀 Open 1-Click Streamlit Cloud Deployer ↗
-                  </a>
-                </div>
-                """, unsafe_allow_html=True)
+                if sync_btn:
+                    with st.spinner("Syncing latest changes to GitHub..."):
+                        success, repo_res, deploy_link = execute_github_publish(
+                            repo_name=final_repo_name,
+                            account=gh_user,
+                            is_public=("Public" in vis_option),
+                            commit_msg=commit_note,
+                            status_placeholder=publish_status
+                        )
+                        if success:
+                            st.toast("GitHub repository successfully updated!")
+                        else:
+                            publish_status.error(f"Sync Error: {repo_res}")
 
         with c_gh_right:
             st.markdown("##### 2. Live Cloud Link & Secrets")

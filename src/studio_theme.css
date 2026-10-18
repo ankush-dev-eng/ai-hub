@@ -82,33 +82,34 @@ html[data-tab="3"] { --a1: #34d399; --a2: #22d3ee; }   /* Tab 4 (Deploy): Emeral
   z-index: 1;
 }
 
-/* ---------- HEADER POINTER-EVENTS: Prevent transparent header from blocking clicks ---------- */
+/* ---------- HEADER SOLID BACKDROP: Prevents scrolled text from leaking through top 60px ---------- */
 header[data-testid="stHeader"] {
-  background: transparent !important;
+  background: #08090d !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
   pointer-events: none !important;
   z-index: 999990 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
 }
 
 header[data-testid="stHeader"] * {
   pointer-events: auto !important;
 }
 
-/* ---------- STICKY TABS: Always Accessible While Scrolling & Generating ---------- */
+/* ---------- STICKY TABS DOCK: Clean, solid, no text collision when scrolling ---------- */
 .stTabs [role="tablist"],
 .stTabs [data-baseweb="tab-list"],
 [data-testid="stTabs"] [role="tablist"] {
   position: sticky !important;
-  top: 3.85rem !important;
+  top: 3.65rem !important;
   z-index: 999995 !important;
   pointer-events: auto !important;
-  background: rgba(14, 16, 24, 0.94) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  background: #0c0e16 !important; /* 100% solid opaque background to shield all content passing underneath */
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 14px !important;
+  border-radius: 12px !important;
   padding: 6px 10px !important;
+  margin-top: 0.4rem !important;
   margin-bottom: 1.2rem !important;
-  box-shadow: 0 12px 36px -10px rgba(0, 0, 0, 0.85) !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
   gap: 6px !important;
 }
 
@@ -219,11 +220,14 @@ section[data-testid="stSidebar"] .stButton > button {
   white-space: nowrap !important;
 }
 
-/* Remove blinking vertical line/caret in dropdowns across the UI while preserving smooth click opening */
+/* Remove blinking vertical line/caret across ALL dropdowns, comboboxes, and select boxes */
 .react-aria-ComboBox input,
 [role="combobox"],
+[role="combobox"] input,
 [data-rac] input,
-div[data-baseweb="select"] input {
+div[data-baseweb="select"] input,
+[data-testid="stSelectbox"] input,
+.stSelectbox input {
   caret-color: transparent !important;
   cursor: pointer !important;
   user-select: none !important;
@@ -232,8 +236,101 @@ div[data-baseweb="select"] input {
 .react-aria-ComboBox,
 .react-aria-ComboBox [role="group"],
 .react-aria-ComboBox button,
-div[data-baseweb="select"] {
+div[data-baseweb="select"],
+[data-testid="stSelectbox"],
+.stSelectbox {
   cursor: pointer !important;
+}
+
+/* Fix option truncation: Give popovers full comfortable width and wrap text so long model descriptions are crystal clear */
+.react-aria-Popover,
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+ul[role="listbox"],
+#stFloatingOverlayPortal [role="listbox"],
+[data-testid="stSelectbox"] [role="listbox"] {
+  min-width: 480px !important;
+  max-width: 95vw !important;
+  width: max-content !important;
+  background: #0e111a !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.92) !important;
+  z-index: 999999 !important;
+}
+
+.react-aria-ListBoxItem,
+[role="option"],
+li[role="option"] {
+  white-space: normal !important;
+  line-height: 1.45 !important;
+  padding: 10px 14px !important;
+  word-break: normal !important;
+  border-radius: 8px !important;
+  margin: 2px 4px !important;
+  font-size: 0.9rem !important;
+}
+
+/* ---------- Interactive Task Checklists in Chat Messages ---------- */
+li.task-list-item,
+ul.contains-task-list li {
+  list-style-type: none !important;
+  margin: 0.5rem 0 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.75rem !important;
+  transition: all 0.25s ease !important;
+  font-size: 0.92rem !important;
+  line-height: 1.5 !important;
+}
+
+li.task-list-item input[type="checkbox"],
+ul.contains-task-list li input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 19px !important;
+  height: 19px !important;
+  margin-top: 3px !important;
+  border-radius: 6px !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.35) !important;
+  background: rgba(15, 18, 28, 0.9) !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  flex-shrink: 0 !important;
+  display: grid !important;
+  place-content: center !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+li.task-list-item input[type="checkbox"]:hover,
+ul.contains-task-list li input[type="checkbox"]:hover {
+  border-color: #22d3ee !important;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.45) !important;
+  transform: scale(1.05) !important;
+}
+
+li.task-list-item input[type="checkbox"]:checked,
+ul.contains-task-list li input[type="checkbox"]:checked {
+  background: linear-gradient(135deg, #10b981, #06b6d4) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.55) !important;
+}
+
+li.task-list-item input[type="checkbox"]:checked::before,
+ul.contains-task-list li input[type="checkbox"]:checked::before {
+  content: "✓" !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  display: block !important;
+}
+
+li.task-list-item.task-completed,
+ul.contains-task-list li.task-completed {
+  color: #94a3b8 !important;
+  text-decoration: line-through !important;
+  opacity: 0.72 !important;
 }
 
 /* ---------- Custom Interactive Cursor (Smooth & Reliable) ---------- */

@@ -156,18 +156,52 @@
       bar.style.transform = 'scaleX(' + Math.min(1, t.scrollTop / max).toFixed(4) + ')';
     }, { capture: true, passive: true });
 
+    /* ---------- Interactive Chat Checklists & Task Persistence ---------- */
+    function enhanceChecklists() {
+      $$('[data-testid="stChatMessage"] li.task-list-item, [data-testid="stChatMessage"] ul.contains-task-list li, [data-testid="stChatMessage"] li:has(input[type="checkbox"])').forEach(function (li) {
+        var cb = li.querySelector('input[type="checkbox"]');
+        if (!cb) return;
+        if (cb.getAttribute('data-interactive') === '1') return;
+        cb.setAttribute('data-interactive', '1');
+        cb.removeAttribute('disabled');
+        cb.style.pointerEvents = 'auto';
+        cb.style.cursor = 'pointer';
+        
+        var taskText = li.textContent.trim().replace(/\s+/g, ' ').substring(0, 100);
+        var storageKey = 'aihub_task_' + taskText;
+        try {
+          if (host.localStorage && host.localStorage.getItem(storageKey) === '1') {
+            cb.checked = true;
+            li.classList.add('task-completed');
+          }
+        } catch (e) {}
+
+        cb.addEventListener('change', function () {
+          if (cb.checked) {
+            li.classList.add('task-completed');
+            try { if (host.localStorage) host.localStorage.setItem(storageKey, '1'); } catch (e) {}
+          } else {
+            li.classList.remove('task-completed');
+            try { if (host.localStorage) host.localStorage.removeItem(storageKey); } catch (e) {}
+          }
+        });
+      });
+    }
+
     /* ---------- Decorate Components & Lock Dropdowns ---------- */
     var CARD = '[data-testid="stExpander"],[data-testid="stChatMessage"],[data-testid="stFileUploaderDropzone"],.step,.cred,.tele,.empty,.ph .cell,.hx-card,[class*="st-key-panel"]';
     function decorate() {
       $$(CARD).forEach(function (n) { 
         if (!n.classList.contains('fx-card')) n.classList.add('fx-card'); 
       });
-      $$('.react-aria-ComboBox input, [role="combobox"], [data-rac] input, select, div[data-baseweb="select"] input').forEach(function (i) { 
+      $$('.react-aria-ComboBox input, [role="combobox"], [data-rac] input, select, div[data-baseweb="select"] input, [data-testid="stSelectbox"] input').forEach(function (i) { 
         if (i.tagName === 'INPUT') { 
           i.style.caretColor = 'transparent'; 
           i.style.cursor = 'pointer'; 
+          i.setAttribute('readonly', 'readonly');
         } 
       });
+      enhanceChecklists();
     }
 
     function checkFullscreen() {
