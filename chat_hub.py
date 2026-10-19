@@ -469,11 +469,16 @@ def render_chat():
                             for cit in m["citations"]:
                                 st.markdown(f"- **{cit.get('source', 'doc')}**: `{cit.get('text', '')}`")
 
+    chip_prompt = None
     # Dock toolbar directly above chat input
     with st.container(key="ch_dock_toolbar"):
-        col_mic, _ = st.columns([2.2, 7.8])
+        col_mic, col_chip = st.columns([2.2, 7.8])
         with col_mic:
             spoken = voice_hub.mic_input(vcfg)
+        with col_chip:
+            if persona.id == "mahaarogya":
+                if st.button("💡 'उष्माघात झाल्यावर काय करावे?' (Ask Heat Stroke)", key="chip_heat", help="1-click demo query for failover test"):
+                    chip_prompt = "उष्माघात झाल्यावर प्राथमिक उपचार काय करावेत?"
 
     # Bottom Sticky Input Dock with Multi-file attachment
     prompt = st.chat_input(
@@ -486,6 +491,8 @@ def render_chat():
     if not prompt and spoken:
         prompt = SimpleNamespace(text=spoken, files=[])
         via_voice = True
+    elif not prompt and chip_prompt:
+        prompt = SimpleNamespace(text=chip_prompt, files=[])
 
     if not prompt:
         return
