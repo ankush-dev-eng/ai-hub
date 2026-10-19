@@ -232,7 +232,7 @@ def query_rag_context(collection, query: str, top_k: int = 3) -> Tuple[str, List
 # Inference & Streaming
 # --------------------------------------------------------------------------- #
 def stream_one(p: Dict[str, Any], model: str, messages: List[Dict[str, Any]], temp: float) -> Generator[str, None, None]:
-    c = OpenAI(base_url=p["base_url"], api_key=p["key"], timeout=90.0)
+    c = OpenAI(base_url=p["base_url"], api_key=p["key"], timeout=15.0)
     resp = c.chat.completions.create(
         model=model,
         messages=messages,
