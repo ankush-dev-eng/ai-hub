@@ -182,13 +182,16 @@ def delete_custom(pid: str) -> None:
 
 # ---------------------------------------------------------------- helpers
 EMERGENCY_KEYWORDS = [
-    "छातीत वेदना", "छाती दुख", "chest pain", "सर्पदंश", "snake bite", "snakebite",
-    "बेशुद्ध", "unconscious", "श्वास", "breathing difficulty", "रक्तस्राव", "heavy bleeding"
+    "chest pain", "सर्पदंश", "साप चाव", "snake bite", "snakebite",
+    "हार्ट अटॅक", "heart attack", "बेशुद्ध", "unconscious", "श्वास", "breathing difficulty",
+    "रक्तस्राव", "heavy bleeding"
 ]
 
 def detect_emergency(text: str) -> bool:
-    """Deterministic keyword guard for acute medical emergencies."""
+    """Deterministic keyword guard for acute medical emergencies with inflection handling."""
     t = (text or "").lower()
+    if "छाती" in t and ("दुख" in t or "वेदन" in t):
+        return True
     return any(k in t for k in EMERGENCY_KEYWORDS)
 
 
