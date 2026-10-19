@@ -181,6 +181,17 @@ def delete_custom(pid: str) -> None:
 
 
 # ---------------------------------------------------------------- helpers
+EMERGENCY_KEYWORDS = [
+    "छातीत वेदना", "छाती दुख", "chest pain", "सर्पदंश", "snake bite", "snakebite",
+    "बेशुद्ध", "unconscious", "श्वास", "breathing difficulty", "रक्तस्राव", "heavy bleeding"
+]
+
+def detect_emergency(text: str) -> bool:
+    """Deterministic keyword guard for acute medical emergencies."""
+    t = (text or "").lower()
+    return any(k in t for k in EMERGENCY_KEYWORDS)
+
+
 def apply_system(messages: list[dict], persona: Persona, extra: str = "") -> list[dict]:
     """Return messages with the persona prompt as the single leading system message.
     `extra` (e.g. RAG context) is appended to that system message."""

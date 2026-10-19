@@ -532,6 +532,12 @@ def render_chat():
 
     # Construct Augmented Prompt Context
     extra_parts = []
+    if persona.id in ("healthcare", "mahaarogya") and persona_hub.detect_emergency(user_text):
+        extra_parts.append(
+            "🚨 CRITICAL EMERGENCY OVERRIDE: Acute red-flag symptoms detected in user prompt. "
+            "You MUST begin your response by immediately instructing them to call 108 or 112 for an emergency ambulance "
+            "before giving any first-aid positioning steps. Never diagnose, never prescribe medications."
+        )
     if rag_context:
         extra_parts.append(rag_context)
 
