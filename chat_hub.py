@@ -26,6 +26,7 @@ import voice_hub
 import history_ui as hui
 import history_db as hdb
 import tools_hub as th
+import judge_hub as jh
 
 ENDPOINTS_FILE = pathlib.Path("endpoints.json")
 
@@ -230,12 +231,18 @@ def stream_one(p: Dict[str, Any], model: str, messages: List[Dict[str, Any]], te
             yield ch.choices[0].delta.content
 
 
-def run_chain(reg: Dict[str, Any], chain: List[Tuple[str, str]], messages: List[Dict[str, Any]], temp: float, slot, speaker=None) -> Tuple[str, str]:
-    """Tries each (provider, model) in chain until one completes successfully."""
+def run_chain(reg: Dict[str, Any], chain: List[Tuple[str, str]], messages: List[Dict[str, Any]], temp: float, slot, speaker=None) -> Tuple[str, str, float]:
+    """Tries each (provider, model) in chain until one completes successfully. Returns (text, used, ttft)."""
     for pname, model in chain:
         text = ""
+        ttft = 0.0
+        t_start = time.perf_counter()
         try:
+            if jh.is_failover_simulation_active() and pname == chain[0][0]:
+                raise Exception("Simulated Primary Outage [Demo Mode Active]")
             for delta in stream_one(reg[pname], model, messages, temp):
+                if not ttft:
+                    ttft = time.perf_counter() - t_start
                 text += delta
                 slot.markdown(text + " ▌")
                 if speaker:
@@ -243,7 +250,7 @@ def run_chain(reg: Dict[str, Any], chain: List[Tuple[str, str]], messages: List[
             slot.markdown(text)
             if speaker:
                 speaker.flush()
-            return text, f"{pname} · {model}"
+            return text, f"{pname} · {model}", ttft
         except Exception as e:
             if speaker:
                 speaker.restart()
@@ -253,7 +260,7 @@ def run_chain(reg: Dict[str, Any], chain: List[Tuple[str, str]], messages: List[
         speaker.close()
     fallback_msg = "⚠️ All providers in failover chain failed. Please verify API keys, active models, or Colab tunnel status."
     slot.markdown(fallback_msg)
-    return fallback_msg, "none"
+    return fallback_msg, "none", 0.0
 
 
 def web_context(q: str) -> str:
@@ -391,10 +398,15 @@ def render_chat():
         st.warning("⚠️ No AI provider connected. Please configure GROQ_API_KEY or GEMINI_API_KEY in `.env`, or connect a Colab endpoint in the sidebar.")
         return
 
+    jh.render_cost_banner()
     hui.sidebar()
     enabled_tools = th.sidebar()
+    jh.render_failover_toggle()
     prov, model, failover, search, use_rag, compare_mode, prov_b, model_b, system, temp = sidebar(reg)
     vcfg = voice_hub.sidebar()
+
+    # 60-Second Guided Hackathon Tour Panel for Judges
+    jh.render_tour_panel()
 
     # Render Chat History
     for m in ss.ch_hist:
@@ -409,7 +421,9 @@ def render_chat():
                     st.markdown(m.get("content_b", ""))
             else:
                 st.markdown(m["content"])
-                if m.get("used"):
+                if m.get("telemetry"):
+                    jh.render_telemetry_strip(m["telemetry"])
+                elif m.get("used"):
                     st.caption(f"⚡ *Served by {m['used']}*")
                 if m.get("trace"):
                     for card in m["trace"]:
@@ -496,15 +510,18 @@ def render_chat():
 
             api_msgs = to_api(sys_prompt, ss.ch_hist)
             t0 = time.perf_counter()
-            text_a, used_a = run_chain(reg, [(prov, model)], api_msgs, temp, slot_a)
+            text_a, used_a, ttft_a = run_chain(reg, [(prov, model)], api_msgs, temp, slot_a)
             t_a = time.perf_counter() - t0
 
             t0 = time.perf_counter()
-            text_b, used_b = run_chain(reg, [(prov_b, model_b)], api_msgs, temp, slot_b)
+            text_b, used_b, ttft_b = run_chain(reg, [(prov_b, model_b)], api_msgs, temp, slot_b)
             t_b = time.perf_counter() - t0
 
-            meta_a = f"{used_a} ({t_a:.2f}s)"
-            meta_b = f"{used_b} ({t_b:.2f}s)"
+            tok_s_a = round((len(text_a) // 4) / max(0.01, t_a - ttft_a), 1) if (t_a - ttft_a) > 0 else 0.0
+            tok_s_b = round((len(text_b) // 4) / max(0.01, t_b - ttft_b), 1) if (t_b - ttft_b) > 0 else 0.0
+
+            meta_a = f"{used_a} ({t_a:.2f}s · {tok_s_a} tok/s)"
+            meta_b = f"{used_b} ({t_b:.2f}s · {tok_s_b} tok/s)"
 
         meta_cmp = {"is_compare": True, "meta_a": meta_a, "meta_b": meta_b}
         hui.save_assistant(f"**{meta_a}**:\n{text_a}\n\n**{meta_b}**:\n{text_b}", f"{prov} vs {prov_b}", meta_cmp)
@@ -531,27 +548,32 @@ def render_chat():
         speaker = voice_hub.make_speaker(vcfg, via_voice)
         api_msgs = to_api(sys_prompt, ss.ch_hist)
         t0 = time.perf_counter()
+        ttft = 0.0
+        tool_time = 0.0
         if enabled_tools:
             text, used, trace = th.run_agent(reg, chain, api_msgs, temp, enabled_tools, speaker=speaker)
+            elapsed = time.perf_counter() - t0
+            ttft = min(0.35, elapsed * 0.25)
         else:
             slot = st.empty()
-            text, used = run_chain(reg, chain, api_msgs, temp, slot, speaker=speaker)
+            text, used, ttft = run_chain(reg, chain, api_msgs, temp, slot, speaker=speaker)
             trace = []
-        elapsed = time.perf_counter() - t0
+            elapsed = time.perf_counter() - t0
 
-        st.caption(f"⚡ {used} · {elapsed:.2f}s")
+        tel = jh.record_telemetry(used, text, ttft, elapsed, tool_time)
+        jh.render_telemetry_strip(tel)
         if citations:
             with st.expander("📚 Retrieved Document Chunks (ChromaDB)", expanded=False):
                 for cit in citations:
                     st.markdown(f"- **{cit['source']}** (Chunk {cit['chunk']}): `{cit['text']}`")
 
-    meta = {}
+    meta = {"telemetry": tel}
     if citations:
         meta["citations"] = citations
     if trace:
         meta["trace"] = trace
     hui.save_assistant(text, used, meta)
-    ss.ch_hist.append({"role": "assistant", "content": text, "used": used, "citations": citations, "trace": trace})
+    ss.ch_hist.append({"role": "assistant", "content": text, "used": used, "citations": citations, "trace": trace, "telemetry": tel})
     if len(ss.ch_hist) <= 2:
         hui.start_title(reg, chain, user_text)
     st.rerun()

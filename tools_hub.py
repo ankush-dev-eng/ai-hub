@@ -388,6 +388,8 @@ def run_agent(reg, chain, messages, temp, enabled, speaker=None):
     for pname, model in chain:
         box, trace = st.empty(), []
         try:
+            if hasattr(st, "session_state") and st.session_state.get("_simulate_failover") and pname == chain[0][0]:
+                raise Exception("Simulated Primary Outage [Demo Mode Active]")
             with box.container():
                 text = _loop(reg[pname], model, list(messages), temp, enabled, speaker, trace)
             if speaker:
