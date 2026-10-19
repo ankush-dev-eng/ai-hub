@@ -42,7 +42,7 @@ BUILTIN = {
     "Gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "key_env": "GEMINI_API_KEY",
-        "models": ["gemini-3.8-flash", "gemini-3.5-flash-lite"],
+        "models": ["gemini-3.5-flash-lite", "gemini-3.8-flash"],
     },
     "OpenRouter": {
         "base_url": "https://openrouter.ai/api/v1",
