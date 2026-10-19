@@ -22,7 +22,8 @@ def _load(sid):
         meta = m["meta"]
         imgs = [u for u in (hdb.load_image(n) for n in meta.get("images", [])) if u]
         out.append({"id": m["id"], "role": m["role"], "content": m["content"], "images": imgs,
-                    "used": meta.get("used"), "display": meta.get("display"), "citations": meta.get("citations")})
+                    "used": meta.get("used"), "display": meta.get("display"), "citations": meta.get("citations"),
+                    "trace": meta.get("trace")})
     return out
 
 

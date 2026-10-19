@@ -25,6 +25,7 @@ from openai import OpenAI
 import voice_hub
 import history_ui as hui
 import history_db as hdb
+import tools_hub as th
 
 ENDPOINTS_FILE = pathlib.Path("endpoints.json")
 
@@ -391,6 +392,7 @@ def render_chat():
         return
 
     hui.sidebar()
+    enabled_tools = th.sidebar()
     prov, model, failover, search, use_rag, compare_mode, prov_b, model_b, system, temp = sidebar(reg)
     vcfg = voice_hub.sidebar()
 
@@ -409,6 +411,9 @@ def render_chat():
                 st.markdown(m["content"])
                 if m.get("used"):
                     st.caption(f"⚡ *Served by {m['used']}*")
+                if m.get("trace"):
+                    for card in m["trace"]:
+                        th.render_card(card)
                 if m.get("citations"):
                     with st.expander("📚 RAG Document Citations", expanded=False):
                         for cit in m["citations"]:
@@ -468,6 +473,8 @@ def render_chat():
 
     # Construct Augmented System Prompt
     sys_prompt = system
+    if enabled_tools:
+        sys_prompt += th.system_note(enabled_tools)
     if rag_context:
         sys_prompt += f"\n\n[Retrieved Context from Uploaded Documents (Local ChromaDB Semantic Search)]:\n{rag_context}\n[End of Context — Answer using these document facts when relevant]"
 
@@ -521,11 +528,15 @@ def render_chat():
         chain += [(p, reg[p]["models"][0]) for p in reg if p != chain[0][0]]
 
     with st.chat_message("assistant"):
-        slot = st.empty()
         speaker = voice_hub.make_speaker(vcfg, via_voice)
         api_msgs = to_api(sys_prompt, ss.ch_hist)
         t0 = time.perf_counter()
-        text, used = run_chain(reg, chain, api_msgs, temp, slot, speaker=speaker)
+        if enabled_tools:
+            text, used, trace = th.run_agent(reg, chain, api_msgs, temp, enabled_tools, speaker=speaker)
+        else:
+            slot = st.empty()
+            text, used = run_chain(reg, chain, api_msgs, temp, slot, speaker=speaker)
+            trace = []
         elapsed = time.perf_counter() - t0
 
         st.caption(f"⚡ {used} · {elapsed:.2f}s")
@@ -534,9 +545,13 @@ def render_chat():
                 for cit in citations:
                     st.markdown(f"- **{cit['source']}** (Chunk {cit['chunk']}): `{cit['text']}`")
 
-    meta = {"citations": citations} if citations else {}
+    meta = {}
+    if citations:
+        meta["citations"] = citations
+    if trace:
+        meta["trace"] = trace
     hui.save_assistant(text, used, meta)
-    ss.ch_hist.append({"role": "assistant", "content": text, "used": used, "citations": citations})
+    ss.ch_hist.append({"role": "assistant", "content": text, "used": used, "citations": citations, "trace": trace})
     if len(ss.ch_hist) <= 2:
         hui.start_title(reg, chain, user_text)
     st.rerun()
