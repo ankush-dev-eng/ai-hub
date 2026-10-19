@@ -25,7 +25,7 @@ COMMERCIAL_COST_PER_TOKEN = 0.000010  # ~$10.00 per 1M blended tokens
 # --------------------------------------------------------------------------- #
 # Telemetry Metrics Logger & Formatter
 # --------------------------------------------------------------------------- #
-def record_telemetry(used: str, text: str, ttft: float, total_time: float, tool_time: float = 0.0) -> Dict[str, Any]:
+def record_telemetry(used: str, text: str, ttft: float, total_time: float, tool_time: float = 0.0, persona_tag: str = "") -> Dict[str, Any]:
     """Calculate and return real metrics for the message."""
     tokens = max(1, len(text) // 4)
     stream_time = max(0.01, total_time - ttft - tool_time)
@@ -34,6 +34,7 @@ def record_telemetry(used: str, text: str, ttft: float, total_time: float, tool_
 
     return {
         "used": used,
+        "persona": persona_tag,
         "tokens": tokens,
         "ttft_ms": round(ttft * 1000, 1),
         "total_time_s": round(total_time, 2),
@@ -51,11 +52,14 @@ def render_telemetry_strip(meta: Dict[str, Any]):
     total_s = meta.get("total_time_s", 0.45)
     used = meta.get("used", "Groq LPU")
     saved = meta.get("cost_saved", 0.002)
+    persona_tag = meta.get("persona")
+    persona_html = f"""<span style="color:#f472b6; font-weight:600;">🎭 {persona_tag}</span><span style="color:rgba(255,255,255,0.25);">|</span>""" if persona_tag else ""
 
     html = f"""
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; padding:6px 12px;
                 background:rgba(14, 18, 28, 0.65); border:1px solid rgba(99, 102, 241, 0.3);
                 border-radius:10px; font-family:'JetBrains Mono', monospace; font-size:0.75rem; color:#cbd5e1;">
+        {persona_html}
         <span style="color:#6366f1; font-weight:600;">⚡ {tok_sec} tok/s</span>
         <span style="color:rgba(255,255,255,0.25);">|</span>
         <span style="color:#22d3ee;">⏱️ TTFT: {ttft}ms</span>
@@ -210,7 +214,14 @@ def render_tour_panel():
             with c_out:
                 st.markdown("**Live Verified Output:**")
                 st.success(step["mock_response"])
-                if active_idx == 2:
+                if active_idx == 1:
+                    import rag_cite
+                    demo_cits = [
+                        rag_cite.Citation(1, "ARCHITECTURE_SPEC.md", "spec_chunk_1", 0.12, 0.94, "Unified Multi-Provider LPU with real-time streaming via Groq Qwen 3.8 and Gemini 3.8 Flash.", 1),
+                        rag_cite.Citation(2, "studio_guide.pdf", "guide_chunk_4", 0.28, 0.86, "Offline document chunking and local semantic search with ChromaDB and MiniLM ONNX embeddings.", 3),
+                    ]
+                    rag_cite.render_citations(demo_cits, "[1] [2]", key="tour_cits")
+                elif active_idx == 2:
                     # Draw a live Matplotlib plot for demonstration
                     import matplotlib.pyplot as plt
                     import numpy as np

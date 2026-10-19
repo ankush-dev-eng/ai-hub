@@ -27,6 +27,8 @@ import history_ui as hui
 import history_db as hdb
 import tools_hub as th
 import judge_hub as jh
+import persona_hub
+import rag_cite
 
 ENDPOINTS_FILE = pathlib.Path("endpoints.json")
 
@@ -150,21 +152,32 @@ def index_attachments_in_rag(collection, files, session_id: str):
         fname = f.name
         ext = pathlib.Path(fname).suffix.lower()
         data = f.getvalue()
-        text_content = ""
 
         if ext == ".pdf":
             try:
                 import pypdf
                 reader = pypdf.PdfReader(io.BytesIO(data))
-                text_content = "\n".join((p.extract_text() or "") for p in reader.pages)
+                for page_num, page in enumerate(reader.pages, 1):
+                    p_txt = page.extract_text() or ""
+                    if len(p_txt.strip()) > 20:
+                        chunks = chunk_document_text(p_txt, chunk_size=600, overlap=100)
+                        for i, chunk in enumerate(chunks):
+                            doc_id = f"{session_id}_{fname}_p{page_num}_{i}"
+                            try:
+                                collection.add(
+                                    documents=[chunk],
+                                    metadatas=[{"source": fname, "filename": fname, "page": page_num, "chunk_idx": i}],
+                                    ids=[doc_id]
+                                )
+                                indexed_count += 1
+                            except Exception:
+                                pass
+                continue
             except Exception:
-                try:
-                    import pdfplumber
-                    with pdfplumber.open(io.BytesIO(data)) as pdf:
-                        text_content = "\n".join((p.extract_text() or "") for p in pdf.pages)
-                except Exception:
-                    pass
-        elif ext in TEXT_EXT:
+                pass
+
+        text_content = ""
+        if ext in TEXT_EXT:
             try:
                 text_content = data.decode("utf-8", errors="replace")
             except Exception:
@@ -177,7 +190,7 @@ def index_attachments_in_rag(collection, files, session_id: str):
                 try:
                     collection.add(
                         documents=[chunk],
-                        metadatas=[{"source": fname, "chunk_idx": i, "total_chunks": len(chunks)}],
+                        metadatas=[{"source": fname, "filename": fname, "chunk_idx": i, "total_chunks": len(chunks)}],
                         ids=[doc_id]
                     )
                     indexed_count += 1
@@ -314,7 +327,7 @@ def to_api(system: str, hist: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 # Sidebar & Controls
 # --------------------------------------------------------------------------- #
-def sidebar(reg: Dict[str, Any]):
+def sidebar(reg: Dict[str, Any], persona: persona_hub.Persona):
     sb = st.sidebar
     sb.markdown("### 🧠 Studio Settings")
 
@@ -325,10 +338,11 @@ def sidebar(reg: Dict[str, Any]):
 
     c1, c2 = sb.columns(2)
     failover = c1.toggle("Auto-Failover", True, help="Automatically switches to next available provider if current hits quota/timeout.")
-    search = c2.toggle("Web Search", False, help="Injects real-time DuckDuckGo search citations into prompt context.")
+    search_default = "web_search" in persona.tools
+    search = c2.toggle("Web Search", value=search_default, help="Injects real-time DuckDuckGo search citations into prompt context.")
 
     c3, c4 = sb.columns(2)
-    use_rag = c3.toggle("Document RAG", True, help="Uses local ChromaDB vector database to retrieve semantically relevant chunks from uploaded files.")
+    use_rag = c3.toggle("Document RAG", value=persona.use_rag, help="Uses local ChromaDB vector database to retrieve semantically relevant chunks from uploaded files.")
     compare_mode = c4.toggle("Compare Arena", False, help="Runs side-by-side comparison of 2 models on the same prompt.")
 
     model_b = None
@@ -341,9 +355,7 @@ def sidebar(reg: Dict[str, Any]):
         models_b = reg[prov_b]["models"]
         model_b = col_mb.selectbox("Opponent Model", models_b, key="ch_model_b")
 
-    persona = sb.selectbox("Persona", list(PERSONAS.keys()))
-    custom_sys = sb.text_area("Custom System Instruction", "", height=70, placeholder="e.g. Always format responses with bullet points...")
-    temp = sb.slider("Temperature", 0.0, 1.2, 0.6, 0.05)
+    temp = persona.temperature
 
     with sb.expander("➕ Connect Endpoint (Colab T4 / Ollama / vLLM)"):
         st.caption("Paste any Cloudflare tunnel or local OpenAI-compatible endpoint:")
@@ -380,8 +392,7 @@ def sidebar(reg: Dict[str, Any]):
     chat_export = json.dumps([{k: v for k, v in m.items() if k != "images"} for m in st.session_state.get("ch_hist", [])], indent=2)
     cb2.download_button("💾 Export JSON", chat_export, "chat_history.json", mime="application/json", use_container_width=True)
 
-    system = PERSONAS[persona] + ("\n" + custom_sys if custom_sys else "")
-    return prov, model, failover, search, use_rag, compare_mode, prov_b, model_b, system, temp
+    return prov, model, failover, search, use_rag, compare_mode, prov_b, model_b, temp
 
 
 # --------------------------------------------------------------------------- #
@@ -400,10 +411,16 @@ def render_chat():
 
     jh.render_cost_banner()
     hui.sidebar()
+    persona = persona_hub.render_sidebar()
+    vcfg = voice_hub.sidebar(default_voice=persona.voice_id)
     enabled_tools = th.sidebar()
     jh.render_failover_toggle()
-    prov, model, failover, search, use_rag, compare_mode, prov_b, model_b, system, temp = sidebar(reg)
-    vcfg = voice_hub.sidebar()
+    prov, model, failover, search, use_rag, compare_mode, prov_b, model_b, temp = sidebar(reg, persona)
+
+    # Active tools: combine persona.tools with tools_hub settings
+    active_tools = enabled_tools if enabled_tools else list(persona.tools)
+    if "run_python" in active_tools and "web_search" in active_tools:
+        active_tools.remove("web_search")
 
     # 60-Second Guided Hackathon Tour Panel for Judges
     jh.render_tour_panel()
@@ -428,10 +445,20 @@ def render_chat():
                 if m.get("trace"):
                     for card in m["trace"]:
                         th.render_card(card)
-                if m.get("citations"):
-                    with st.expander("📚 RAG Document Citations", expanded=False):
-                        for cit in m["citations"]:
-                            st.markdown(f"- **{cit['source']}** (Chunk {cit['chunk']}): `{cit['text']}`")
+
+                # Render RAG citations (with colored relevance badges and popover previews)
+                mid = m.get("id")
+                loaded_cits = rag_cite.load_citations(mid) if mid else []
+                if loaded_cits:
+                    rag_cite.render_citations(loaded_cits, m["content"], key=f"hist_c_{mid}")
+                elif m.get("citations") and isinstance(m["citations"], list) and len(m["citations"]) > 0:
+                    first = m["citations"][0]
+                    if isinstance(first, rag_cite.Citation):
+                        rag_cite.render_citations(m["citations"], m["content"], key=f"hist_c_obj_{m.get('id', id(m))}")
+                    elif isinstance(first, dict):
+                        with st.expander("📚 RAG Document Citations", expanded=False):
+                            for cit in m["citations"]:
+                                st.markdown(f"- **{cit.get('source', 'doc')}**: `{cit.get('text', '')}`")
 
     # Dock toolbar directly above chat input
     with st.container(key="ch_dock_toolbar"):
@@ -441,7 +468,7 @@ def render_chat():
 
     # Bottom Sticky Input Dock with Multi-file attachment
     prompt = st.chat_input(
-        "Ask anything or attach code, PDF & images...",
+        f"Ask {persona.name} or attach code, PDF & images...",
         accept_file="multiple",
         file_type=["png", "jpg", "jpeg", "webp", "pdf", "py", "js", "ts", "md", "json", "csv", "txt", "sql", "sh"],
     )
@@ -458,8 +485,6 @@ def render_chat():
     file_text, imgs = parse_files(prompt.files)
 
     # Local ChromaDB Vector RAG Indexing
-    rag_context = ""
-    citations = []
     if use_rag and prompt.files:
         coll = get_session_collection(ss.session_id)
         if coll:
@@ -467,16 +492,20 @@ def render_chat():
             if count > 0:
                 st.toast(f"📚 Indexed {count} document chunks into local ChromaDB vector store!", icon="🧠")
 
+    # Local ChromaDB Vector RAG Retrieval
+    cits = []
+    rag_context = ""
     if use_rag and user_text:
         coll = get_session_collection(ss.session_id)
         if coll and coll.count() > 0:
-            rag_context, citations = query_rag_context(coll, user_text, top_k=3)
+            cits = rag_cite.retrieve(coll, user_text, k=persona.rag_top_k) if persona.use_rag else []
+            rag_context = rag_cite.build_context(cits) if cits else ""
 
     # Append user message
     display_content = user_text or ("*(Attached files)*" if prompt.files else "")
     full_content = user_text + file_text
-    hui.save_user(display_content, full_content, imgs)
-    ss.ch_hist.append({"role": "user", "content": full_content, "images": imgs})
+    mid_user = hui.save_user(display_content, full_content, imgs)
+    ss.ch_hist.append({"id": mid_user, "role": "user", "content": full_content, "images": imgs})
 
     with st.chat_message("user"):
         st.markdown(user_text or "*(File attachments)*")
@@ -485,17 +514,22 @@ def render_chat():
         if prompt.files:
             st.caption("📎 " + ", ".join(f.name for f in prompt.files))
 
-    # Construct Augmented System Prompt
-    sys_prompt = system
-    if enabled_tools:
-        sys_prompt += th.system_note(enabled_tools)
+    # Construct Augmented Prompt Context
+    extra_parts = []
     if rag_context:
-        sys_prompt += f"\n\n[Retrieved Context from Uploaded Documents (Local ChromaDB Semantic Search)]:\n{rag_context}\n[End of Context — Answer using these document facts when relevant]"
+        extra_parts.append(rag_context)
 
     if search and user_text:
         web_res = web_context(user_text)
         if web_res:
-            sys_prompt += f"\n\n[Web Search Results via DuckDuckGo]:\n{web_res}\n[End of Web Results — Cite links when appropriate]"
+            extra_parts.append(f"[Web Search Results via DuckDuckGo]:\n{web_res}\n[End of Web Results — Cite links when appropriate]")
+
+    if active_tools:
+        extra_parts.append(th.system_note(active_tools))
+
+    combined_extra = "\n\n".join(extra_parts)
+    raw_api_msgs = to_api("", ss.ch_hist)
+    api_msgs = persona_hub.apply_system(raw_api_msgs, persona, extra=combined_extra)
 
     # Model Arena / Side-by-Side Compare Mode Execution
     if compare_mode and prov_b and model_b:
@@ -508,7 +542,6 @@ def render_chat():
                 st.markdown(f"#### ✨ {prov_b} · {model_b}")
                 slot_b = st.empty()
 
-            api_msgs = to_api(sys_prompt, ss.ch_hist)
             t0 = time.perf_counter()
             text_a, used_a, ttft_a = run_chain(reg, [(prov, model)], api_msgs, temp, slot_a)
             t_a = time.perf_counter() - t0
@@ -524,8 +557,9 @@ def render_chat():
             meta_b = f"{used_b} ({t_b:.2f}s · {tok_s_b} tok/s)"
 
         meta_cmp = {"is_compare": True, "meta_a": meta_a, "meta_b": meta_b}
-        hui.save_assistant(f"**{meta_a}**:\n{text_a}\n\n**{meta_b}**:\n{text_b}", f"{prov} vs {prov_b}", meta_cmp)
+        mid_cmp = hui.save_assistant(f"**{meta_a}**:\n{text_a}\n\n**{meta_b}**:\n{text_b}", f"{prov} vs {prov_b}", meta_cmp)
         ss.ch_hist.append({
+            "id": mid_cmp,
             "role": "assistant",
             "is_compare": True,
             "content_a": text_a,
@@ -546,12 +580,11 @@ def render_chat():
 
     with st.chat_message("assistant"):
         speaker = voice_hub.make_speaker(vcfg, via_voice)
-        api_msgs = to_api(sys_prompt, ss.ch_hist)
         t0 = time.perf_counter()
         ttft = 0.0
         tool_time = 0.0
-        if enabled_tools:
-            text, used, trace = th.run_agent(reg, chain, api_msgs, temp, enabled_tools, speaker=speaker)
+        if active_tools:
+            text, used, trace = th.run_agent(reg, chain, api_msgs, temp, active_tools, speaker=speaker)
             elapsed = time.perf_counter() - t0
             ttft = min(0.35, elapsed * 0.25)
         else:
@@ -560,20 +593,22 @@ def render_chat():
             trace = []
             elapsed = time.perf_counter() - t0
 
-        tel = jh.record_telemetry(used, text, ttft, elapsed, tool_time)
+        persona_tag = f"{persona.icon} {persona.name}"
+        tel = jh.record_telemetry(used, text, ttft, elapsed, tool_time, persona_tag=persona_tag)
         jh.render_telemetry_strip(tel)
-        if citations:
-            with st.expander("📚 Retrieved Document Chunks (ChromaDB)", expanded=False):
-                for cit in citations:
-                    st.markdown(f"- **{cit['source']}** (Chunk {cit['chunk']}): `{cit['text']}`")
+        if cits:
+            rag_cite.render_citations(cits, text, key="live_cits")
 
     meta = {"telemetry": tel}
-    if citations:
-        meta["citations"] = citations
+    if cits:
+        meta["has_citations"] = True
     if trace:
         meta["trace"] = trace
-    hui.save_assistant(text, used, meta)
-    ss.ch_hist.append({"role": "assistant", "content": text, "used": used, "citations": citations, "trace": trace, "telemetry": tel})
+    mid = hui.save_assistant(text, used, meta)
+    if cits:
+        rag_cite.save_citations(mid, cits)
+
+    ss.ch_hist.append({"id": mid, "role": "assistant", "content": text, "used": used, "citations": cits, "trace": trace, "telemetry": tel})
     if len(ss.ch_hist) <= 2:
         hui.start_title(reg, chain, user_text)
     st.rerun()

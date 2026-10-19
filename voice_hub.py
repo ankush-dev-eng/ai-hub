@@ -125,11 +125,18 @@ def speak(text: str, cfg: dict, via_voice: bool = False):
 
 
 # ---------- UI ----------
-def sidebar() -> dict:
+def sidebar(default_voice: str | None = None) -> dict:
     sb = st.sidebar
     sb.markdown("### 🎙️ Voice")
     mode = sb.selectbox("Speak replies", MODES)
-    voice = VOICES[sb.selectbox("Voice", list(VOICES.keys()))]
+    v_keys = list(VOICES.keys())
+    default_idx = 0
+    if default_voice:
+        for idx, k in enumerate(v_keys):
+            if VOICES[k] == default_voice:
+                default_idx = idx
+                break
+    voice = VOICES[sb.selectbox("Voice", v_keys, index=default_idx)]
     rate = sb.slider("Speed", -30, 50, 0, 5, format="%d%%")
     lang = LANGS[sb.selectbox("Speech language", list(LANGS.keys()))]
     if sb.button("🔇 Stop audio", use_container_width=True):
