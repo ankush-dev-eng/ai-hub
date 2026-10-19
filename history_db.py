@@ -70,12 +70,12 @@ def init():
     _ready = True
 
 
-# ---------- sessions ----------
-def new_session(title: str = "New chat") -> str:
+def new_session(title: str = "New chat", sid: str | None = None) -> str:
     init()
-    sid, now = uuid.uuid4().hex[:12], time.time()
+    sid = sid or uuid.uuid4().hex[:12]
+    now = time.time()
     with _db() as c:
-        c.execute("INSERT INTO sessions(id,title,created_at,updated_at) VALUES(?,?,?,?)", (sid, title[:80], now, now))
+        c.execute("INSERT OR REPLACE INTO sessions(id,title,created_at,updated_at) VALUES(?,?,?,?)", (sid, title[:80], now, now))
     return sid
 
 

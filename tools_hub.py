@@ -441,6 +441,8 @@ def _running_label(name, args):
 def card_label(c) -> str:
     t = c.get("tool")
     if not c.get("ok"):
+        if c.get("timed_out"):
+            return f"⏱️ Python timed out ({c.get('seconds', '20')}s limit)"
         return f"⚠️ {t} failed"
     if t == "web_search":
         return f"🔎 {c['args'].get('query', '')} · {len(c.get('results', []))} sources"
@@ -454,9 +456,12 @@ def card_label(c) -> str:
 def render_card_body(c):
     import streamlit as st
     t = c.get("tool")
-    if not c.get("ok") and c.get("error"):
-        st.error(c["error"])
-    elif t == "web_search":
+    if not c.get("ok"):
+        if c.get("timed_out"):
+            st.warning("⏱️ Subprocess execution timed out (exceeded the 20-second safety limit).")
+        elif c.get("error"):
+            st.error(c["error"])
+    if t == "web_search":
         for r in c.get("results", []):
             with st.container(border=True):
                 dom = urlparse(r["url"]).netloc.replace("www.", "")

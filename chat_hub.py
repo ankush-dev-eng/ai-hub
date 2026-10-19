@@ -299,7 +299,10 @@ def parse_files(files) -> Tuple[str, List[str]]:
             try:
                 import pypdf
                 body = "\n".join((pg.extract_text() or "") for pg in pypdf.PdfReader(io.BytesIO(data)).pages)
-                text += f"\n\n--- 📑 ATTACHED PDF: {f.name} ---\n{body[:40000]}\n--- END OF FILE {f.name} ---\n"
+                if not body.strip():
+                    text += f"\n\n[Attached PDF: {f.name} contains scanned images or no extractable text.]\n"
+                else:
+                    text += f"\n\n--- 📑 ATTACHED PDF: {f.name} ---\n{body[:40000]}\n--- END OF FILE {f.name} ---\n"
             except Exception as e:
                 text += f"\n\n[Attached PDF: {f.name} ({len(data)} bytes, unreadable text)]"
         elif ext in TEXT_EXT:
@@ -442,6 +445,12 @@ def render_chat():
                     jh.render_telemetry_strip(m["telemetry"])
                 elif m.get("used"):
                     st.caption(f"⚡ *Served by {m['used']}*")
+
+                # Lightweight audio replay button
+                if m.get("role") == "assistant" and len(m.get("content", "")) > 10:
+                    if st.button("🔊 Replay Voice", key=f"rpl_{m.get('id', id(m))}", help="Play answer with neural TTS voice"):
+                        voice_hub.replay_audio(m["content"], vcfg)
+
                 if m.get("trace"):
                     for card in m["trace"]:
                         th.render_card(card)

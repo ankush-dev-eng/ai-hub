@@ -180,14 +180,121 @@ TOUR_STEPS = [
 ]
 
 
+def load_demo_data():
+    """One-click preload for hackathon judges: pre-indexes health guidelines into ChromaDB,
+    creates 3 demo chats in SQLite, and switches to MahaArogya persona."""
+    import history_db as hdb
+    import rag_cite
+
+    hdb.init()
+    demo_sid = "demo_mahaarogya_phc"
+
+    # 1. Create or ensure demo sessions exist
+    if not hdb.session_exists(demo_sid):
+        hdb.new_session("🩺 MahaArogya Rural Health Guidance", sid=demo_sid)
+        hdb.add_message(demo_sid, "user", "माझ्या आजोबांना अचानक छातीत तीव्र वेदना होत आहेत आणि भरपूर घाम येत आहे. मी काय करू?",
+                        {"display": "माझ्या आजोबांना अचानक छातीत तीव्र वेदना होत आहेत आणि भरपूर घाम येत आहे. मी काय करू?"})
+        ans_text = ("⚠️ **तातडीचा इशारा**: ही गंभीर वैद्यकीय आणीबाणी (संभाव्य हृदयविकाराचा झटका) असू शकते! [1]\n\n"
+                    "1. **तातडीने १०८ किंवा ११२ वर कॉल करा** आणि मोफत आपत्कालीन रुग्णवाहिका बोलवा. [2]\n"
+                    "2. रुग्णवाहिका येईपर्यंत आजोबांना हवेशीर ठिकाणी पाठीला आधार देऊन **आरामदायी स्थितीत बसवून ठेवा**, झोपवू नका किंवा गर्दी करू नका.\n"
+                    "3. कोणतेही घरातील औषध किंवा पाणी बळजबरीने पाजू नका.\n"
+                    "4. रुग्णवाहिका उपलब्ध नसल्यास त्वरित जवळच्या प्राथमिक आरोग्य केंद्रात (PHC) किंवा ग्रामीण रुग्णालयात हलवा. [1]")
+        m_id = hdb.add_message(demo_sid, "assistant", ans_text, {
+            "used": "Groq · qwen/qwen3.8-27b",
+            "telemetry": {
+                "used": "Groq LPU", "persona": "🩺 MahaArogya Rural Health Assistant",
+                "tokens": 142, "ttft_ms": 105.4, "total_time_s": 0.38, "tool_time_s": 0.0,
+                "tok_per_sec": 425.2, "cost_saved": 0.0014, "ts": time.time()
+            }
+        })
+        cits = [
+            rag_cite.Citation(1, "maharashtra_phc_protocols.pdf", "phc_chunk_1", 0.08, 0.96,
+                              "हृदयविकार किंवा छातीत तीव्र वेदना असल्यास त्वरित १०८ रुग्णवाहिका किंवा जवळच्या PHC केंद्राशी संपर्क साधावा. रुग्णाला बसवून ठेवावे.", 1),
+            rag_cite.Citation(2, "national_health_mission_guide.pdf", "nhm_chunk_3", 0.16, 0.92,
+                              "महाराष्ट्र राज्य आरोग्य हमी योजना व राष्ट्रीय आरोग्य अभियानांतर्गत १०८ आणि १०४ आपत्कालीन रुग्णवाहिका सेवा मोफत उपलब्ध आहे.", 3),
+        ]
+        rag_cite.save_citations(m_id, cits)
+
+    sec_sid = "demo_security_audit"
+    if not hdb.session_exists(sec_sid):
+        hdb.new_session("🛡️ Code Security Audit: SQL Injection", sid=sec_sid)
+        hdb.add_message(sec_sid, "user", "Audit this database query function for vulnerabilities:\ndef get_user(uid): return db.execute(f'SELECT * FROM users WHERE id = {uid}').fetchone()",
+                        {"display": "Audit this database query function for vulnerabilities"})
+        sec_ans = ("### 🛡️ Security Audit Findings\n\n"
+                   "- **Vulnerability**: Critical SQL Injection (CWE-89)\n"
+                   "- **Location**: `f'SELECT * FROM users WHERE id = {uid}'`\n"
+                   "- **Risk**: An attacker can supply `uid = '1 OR 1=1'` to dump credentials or `'1; DROP TABLE users'` for data destruction.\n\n"
+                   "#### 🩹 Concrete Remediation Patch:\n"
+                   "```python\ndef get_user(uid: int):\n    # Use parameterized query bindings (never f-strings)\n    return db.execute('SELECT * FROM users WHERE id = ?', (uid,)).fetchone()\n```\n"
+                   "Verified defensive patch with parameterized input isolation.")
+        hdb.add_message(sec_sid, "assistant", sec_ans, {
+            "used": "Groq · qwen/qwen3.8-27b · tools",
+            "telemetry": {
+                "used": "Groq LPU", "persona": "🛡️ Code Auditor",
+                "tokens": 168, "ttft_ms": 112.0, "total_time_s": 0.42, "tool_time_s": 0.0,
+                "tok_per_sec": 410.0, "cost_saved": 0.0017, "ts": time.time()
+            }
+        })
+
+    viva_sid = "demo_technical_viva"
+    if not hdb.session_exists(viva_sid):
+        hdb.new_session("🎓 Technical Viva: Transformer Attention", sid=viva_sid)
+        hdb.add_message(viva_sid, "user", "Start my technical viva on Transformer architecture.",
+                        {"display": "Start my technical viva on Transformer architecture."})
+        viva_ans = ("Welcome to your technical viva. Let's begin at medium difficulty.\n\n"
+                    "**Question 1**: Explain why the dot product in Scaled Dot-Product Attention is scaled by 1/sqrt(d_k), and what happens to the softmax gradients when d_k becomes very large without this scaling?")
+        hdb.add_message(viva_sid, "assistant", viva_ans, {
+            "used": "Groq · qwen/qwen3.8-27b",
+            "telemetry": {
+                "used": "Groq LPU", "persona": "🎓 Viva / Technical Examiner",
+                "tokens": 78, "ttft_ms": 98.0, "total_time_s": 0.22, "tool_time_s": 0.0,
+                "tok_per_sec": 395.0, "cost_saved": 0.0008, "ts": time.time()
+            }
+        })
+
+    # 2. Index health guidelines into ChromaDB for demo_sid
+    try:
+        import chromadb
+        client = chromadb.Client()
+        coll = client.get_or_create_collection(f"rag_{demo_sid[:40]}")
+        if coll.count() == 0:
+            docs = [
+                "महाराष्ट्र शासन सार्वजनिक आरोग्य विभाग: छातीत तीव्र वेदना, श्वास घेण्यात अडचण किंवा बेशुद्ध पडणे या गंभीर लक्षणांसाठी त्वरित १०८ रुग्णवाहिका बोलवावी. प्राथमिक आरोग्य केंद्रात (PHC) प्रथमोपचार उपलब्ध असतात.",
+                "राष्ट्रीय आरोग्य अभियान (NHM): १०८ रुग्णवाहिका २४ तास मोफत उपलब्ध आहे. १०४ हेल्पलाइनवर मोफत वैद्यकीय सल्ला मिळतो. सर्पदंश, हृदयविकार, आणि प्रसूतीसाठी मोफत सेवा.",
+                "उष्माघात (Heat Stroke) प्राथमिक उपचार: रुग्णाला थंड व सावलीच्या जागी आणावे. ओल्या कपड्याने शरीर पुसावे. ओआरएस (ORS) किंवा लिंबू पाणी द्यावे. तीव्र ताप असल्यास ताबडतोब PHC मध्ये न्यावे.",
+                "अतिसार व डिहायड्रेशन: वारंवार ओआरएस (ORS) पाणी प्यावे. हलका आहार घ्यावा. बालकांमध्ये डिहायड्रेशनची लक्षणे दिसल्यास तातडीने आशा स्वयंसेविका किंवा अंगणवाडी सेविकेशी संपर्क साधावा."
+            ]
+            metas = [
+                {"source": "maharashtra_phc_protocols.pdf", "filename": "maharashtra_phc_protocols.pdf", "page": 1, "chunk_idx": 0},
+                {"source": "national_health_mission_guide.pdf", "filename": "national_health_mission_guide.pdf", "page": 3, "chunk_idx": 1},
+                {"source": "summer_heatwave_advisory.pdf", "filename": "summer_heatwave_advisory.pdf", "page": 1, "chunk_idx": 2},
+                {"source": "rural_maternal_child_care.pdf", "filename": "rural_maternal_child_care.pdf", "page": 2, "chunk_idx": 3},
+            ]
+            ids = [f"demo_chunk_{i}" for i in range(4)]
+            coll.add(documents=docs, metadatas=metas, ids=ids)
+    except Exception:
+        pass
+
+    st.session_state["sid"] = demo_sid
+    st.session_state["persona_id"] = "mahaarogya"
+    st.query_params["s"] = demo_sid
+    st.toast("🎉 Loaded 3 demo chats & indexed guidelines! MahaArogya ready.", icon="🚀")
+
+
 def render_tour_panel():
     """Renders the 60-Second Guided Tour panel in an expander for live demos."""
     with st.expander("🚀 60-Second Hackathon Judge Tour (Interactive Showcase)", expanded=False):
-        st.markdown(
-            """
-            *Designed for 3-minute hackathon judging demos. Walk through all 4 flagship capabilities in one click.*
-            """
-        )
+        c_tour, c_demo = st.columns([2.6, 1.4])
+        with c_tour:
+            st.markdown(
+                """
+                *Designed for 3-minute hackathon judging demos. Walk through all 4 flagship capabilities in one click.*
+                """
+            )
+        with c_demo:
+            if st.button("✨ Load 1-Click Demo Data", key="load_demo_data_btn", use_container_width=True, type="primary"):
+                load_demo_data()
+                st.rerun()
 
         cols = st.columns(4)
         for idx, (col, step) in enumerate(zip(cols, TOUR_STEPS)):

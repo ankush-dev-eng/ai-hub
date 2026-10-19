@@ -1,13 +1,13 @@
 <div align="center">
 
 # ⚡ AI HUB — Autonomous Multi-Model Prototyping Studio
-### *Zero-GPU Hackathon Studio for Real-Time LLM Streaming, Multimodal Vision, Vector Art & Cloud Video Synthesis*
+### *Zero-GPU Hackathon Studio for Real-Time LLM Streaming, Multilingual Neural Voice, Local ChromaDB Vector RAG & Agentic Subprocess Execution*
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-6366f1.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22d3ee.svg?style=for-the-badge)](LICENSE)
-[![Zero GPU Required](https://img.shields.io/badge/Hardware-0%25%20Local%20GPU-34d399.svg?style=for-the-badge)](https://github.com/ankush-dev-eng/ai-hub)
-[![Cloud Inference](https://img.shields.io/badge/Cloud-100%25%20Free%20Tier-ec4899.svg?style=for-the-badge)](https://github.com/ankush-dev-eng/ai-hub)
+[![Zero Cost Required](https://img.shields.io/badge/Cost-%240.00%20(100%25%20Free%20Tier)-34d399.svg?style=for-the-badge)](https://github.com/ankush-dev-eng/ai-hub)
+[![Zero GPU Required](https://img.shields.io/badge/Hardware-0%25%20Local%20GPU-ec4899.svg?style=for-the-badge)](https://github.com/ankush-dev-eng/ai-hub)
 
 <br/>
 
@@ -22,10 +22,10 @@
 ```
 
 <p align="center">
-  <b>Instant Hot-Swappable LLMs</b> • 
-  <b>Multimodal Document & Vision Auditing</b> • 
-  <b>FLUX.1 High-Resolution Art</b> • 
-  <b>Zero-Card Cloud Deployer</b>
+  <b>450+ tok/s Unified LPU Hub</b> • 
+  <b>Multilingual Sentence-Streaming Voice</b> • 
+  <b>Local ChromaDB Vector RAG with Popover Badges</b> • 
+  <b>Judge & Demo Presentation Mode</b>
 </p>
 
 </div>
@@ -34,14 +34,7 @@
 
 ## 🌌 Overview
 
-**AI Hub** is a multi-model workspace engineered for hackathons, rapid prototyping, and production MVPs. It unifies the world's fastest and most capable free cloud AI engines into a unified translucent glass dashboard that runs at **0% local GPU load**.
-
-### 🌟 Key Highlights
-* **⚡ 450+ tok/s Instant Inference:** Powered by Groq LPU (Qwen 3.8 27B, Llama 3.3 70B, GPT-OSS).
-* **👁️ Multimodal Visual Auditing:** Integrated Google Gemini 3.8 Flash Vision for OCR, code audits, architecture diagram critique, and multi-image context.
-* **🎨 Cloud & Colab Media Studio:** 1024×1024 FLUX.1 generative art, vector anime logos, and procedural 44.1kHz stereo soundscapes.
-* **🚀 Universal 1-Click Cloud Deployer:** Auto-discovers any public GitHub repository (e.g. `ankush-dev-eng/NiveshRakshak`), detects non-standard entrypoints (like `backend/main.py`), and pre-configures zero-error deployment links for Streamlit Community Cloud.
-* **💎 Luxury Glass Aurora UI:** Translucent frosted panels, cursor-following atmospheric aurora lighting, and seamless collapsing sidebars.
+**AI Hub** is an elite multi-model AI workspace designed for rapid hackathon prototyping, live technical demonstrations, and production MVPs. It unifies the fastest free-tier cloud inference engines, real-time sentence-level neural voice synthesis, local vector embeddings, and sandboxed code execution into a luxury translucent glass UI running at **0% local GPU load** and **$0.00 lifetime cost**.
 
 ---
 
@@ -49,123 +42,150 @@
 
 ```mermaid
 flowchart TD
-    User["👤 Developer / Hackathon Team"] --> UI["🌌 AI Hub Luxury Glass Frontend (Streamlit)"]
+    User["👤 User / Hackathon Judge"] --> UI["🌌 Luxury Glass Aurora Frontend (Streamlit)"]
 
-    subgraph "🎨 UI & State Engine"
-        UI --> Nav["💎 Translucent Sticky Navigation"]
-        Nav --> Tab1["⚡ Conversational Studio"]
-        Nav --> Tab2["◈ Visual & Document Auditor"]
-        Nav --> Tab3["✦ Free Image & Video Studio"]
-        Nav --> Tab4["↗ Deployment & Cloud Studio"]
+    subgraph "🎙️ Voice & Multimodal Input"
+        UI --> VoiceIn["🎙️ Groq Whisper LPU STT (CPU faster-whisper fallback)"]
+        UI --> FileIn["📎 PDF, Code & Image Attachments"]
     end
 
-    subgraph "🧠 Multi-Model Cloud Inference"
-        Tab1 --> Groq["⚡ Groq LPU (~320–450 tok/s)<br/>Qwen 3.8 27B · Llama 3.3 70B"]
-        Tab1 --> Gem["✨ Google Gemini 3.8 Flash<br/>1M Context · Multimodal Vision"]
-        Tab1 --> OR["🧠 OpenRouter Free Cluster<br/>DeepSeek-R1 · Gemma 4 31B"]
-        Tab1 --> Colab["🚀 Dedicated Google Colab T4 GPU<br/>SDXL · AnimateDiff · Custom Weights"]
+    subgraph "🧠 Conversational & Persona Hub"
+        UI --> Persona["🎭 Persona Engine (MahaArogya, Examiner, Code Auditor)"]
+        Persona --> Router["⚡ Unified Multi-Provider Failover Router"]
+        
+        Router --> Groq["⚡ Groq LPU (~350–450 tok/s)<br/>Qwen 3.8 27B · GPT-OSS"]
+        Router --> Gem["✨ Google Gemini 3.8 Flash<br/>1M Context · Multimodal OCR"]
+        Router --> OR["🧠 OpenRouter Free Cluster<br/>Nemotron 3.5 · DeepSeek"]
+        Router --> Colab["🚀 Colab T4 Ollama Bridge<br/>Free Cloudflare Tunnels"]
     end
 
-    subgraph "🛠️ Vision & Generative Pipelines"
-        Tab2 --> VisAudit["🔍 Deep Inspection & Technical Review"]
-        Tab3 --> FluxCloud["🎨 Pollinations FLUX.1 (1024×1024)"]
-        Tab3 --> SynthAudio["🎵 Stereo PCM 44.1kHz Audio Engine"]
+    subgraph "📚 Local Vector RAG Engine"
+        FileIn --> Chunk["📑 Page-by-Page Document Chunking"]
+        Chunk --> Chroma["💾 Local ChromaDB (MiniLM-L6-v2 ONNX Embeddings)"]
+        Chroma --> Cits["🏷️ Interactive Popover Relevance Badges [1] [2]"]
     end
 
-    subgraph "☁️ Universal Deployment Engine"
-        Tab4 --> GHAPI["🐙 GitHub Public API & Tree Walker"]
-        GHAPI --> EntryDetect["🔎 Auto-Detect .py Entrypoints<br/>(backend/main.py · app.py)"]
-        EntryDetect --> StreamlitCloud["🚀 1-Click Streamlit Community Cloud"]
+    subgraph "🛠️ Agentic Tool Execution"
+        Router --> AgentLoop["🔄 OpenAI-Compatible Tool Loop"]
+        AgentLoop --> Calc["🧮 Safe AST Calculator (No eval)"]
+        AgentLoop --> Search["🔎 DuckDuckGo Live Search"]
+        AgentLoop --> PyRunner["🐍 Subprocess Python Runner (20s limit + Matplotlib capture)"]
+    end
+
+    subgraph "💾 Persistence & Telemetry"
+        UI --> SQLite["🗄️ SQLite WAL History Engine (chat_data/history.db)"]
+        UI --> Judge["📊 Live Telemetry (TTFT, tok/s, $0.00 Cost Counter)"]
     end
 ```
 
 ---
 
-## ⚡ Supported Cloud Engines & Models
+## 🌟 Flagship Features
 
-| Engine | Primary Models | Context Window | Speed | Cost |
-| :--- | :--- | :--- | :--- | :--- |
-| **⚡ Groq LPU** | `qwen/qwen3.8-27b`, `llama-3.3-70b-versatile`, `gpt-oss-120b` | 131K tokens | **~320 – 450 tok/s** | **100% Free** |
-| **✨ Google Gemini** | `gemini-3.8-flash`, `gemini-2.5-flash-lite`, `gemini-3.1-flash-lite` | **1,000,000 tokens** | ~180 tok/s | **100% Free** |
-| **🧠 OpenRouter** | `deepseek/deepseek-r1:free`, `google/gemma-4-31b-it:free` | 64K tokens | ~70 – 140 tok/s | **100% Free** |
-| **🎨 Cloud FLUX** | Pollinations FLUX.1 Schnell | 1024×1024 px | ~2.5s render | **100% Free** |
-| **🚀 Colab Bridge** | Google Colab Free 16GB T4 GPU (SDXL, Video, PyTorch) | Custom | Dedicated GPU | **100% Free** |
+### 1. ⚡ 450+ tok/s Multi-Provider Failover Engine
+- Speaks universal OpenAI wire format across **Groq LPU**, **Google Gemini Flash**, **OpenRouter**, and **custom Colab T4 Ollama tunnels** (`endpoints.json`).
+- **Zero-Downtime Auto-Failover**: If the primary provider hits rate limits or network issues, the request instantly cascades to secondary providers without user disruption.
+- **Model Arena**: Side-by-side benchmark mode to evaluate two models simultaneously on the same prompt with live speed and latency telemetry.
+
+### 2. 🎙️ Parallel Sentence-Level Streaming Neural Voice
+- **Low-Latency Synthesis**: Edge-TTS workers synthesize audio clips sentence-by-sentence in parallel as tokens stream in.
+- **Multilingual Support**: Real-time neural voices for Indian English (`en-IN-NeerjaNeural`, `en-IN-PrabhatNeural`), Hindi (`hi-IN-SwaraNeural`), and Marathi (`mr-IN-AarohiNeural`).
+- **Devanagari Auto-Routing**: Automatic language detection ensures Hindi/Marathi text never reads phonetically garbled.
+- **Parent Window Queue**: Clips play consecutively via a persistent parent queue that survives Streamlit component re-renders.
+- **Instant Voice Replay**: Historical assistant messages feature an instant `🔊 Replay Voice` button.
+
+### 3. 📚 Local ChromaDB Vector RAG with Popover Citation Badges
+- **100% Offline & Free**: Local ONNX `all-MiniLM-L6-v2` embeddings run on CPU without requiring embedding API keys.
+- **Page-Level PDF Extraction**: Extracts documents page-by-page and stores exact page numbers in metadata.
+- **Accurate Relevance Scoring**: Automatically detects vector distance space (`l2` vs `cosine`) and computes 0%–100% relevance scores.
+- **Interactive Badges**: Color-coded relevance badges (`🟢 >=50%`, `🟡 >=35%`, `🔴 <35%`) with checkmarks (`✓`) indicating which sources were cited. Clicking opens popover previews with chunk text, page number, and distance metrics.
+- **Untrusted Context Guard**: Built-in prompt defense prevents prompt injection attacks from malicious uploaded files.
+
+### 4. 🎭 Specialized Hackathon Persona Presets
+- **🩺 MahaArogya Rural Health Assistant**: Marathi/Hindi-first village health guidance, 108/112 emergency escalation protocols, home-care basics, and strict no-diagnosis safety guards.
+- **🎓 Viva / Technical Examiner**: Quizzes students one question at a time, grades answers out of 10, provides diagnostic feedback, and dynamically scales difficulty.
+- **🛡️ Defensive Code Auditor**: Identifies critical vulnerabilities (SQLi, XSS, SSRF, race conditions) and provides verified drop-in remediation patches.
+- **💬 General Assistant**: Balanced everyday assistant with web search and calculator.
+- **Custom Persona Builder**: Sidebar expander to create and persist custom personas (`chat_data/personas.json`).
+
+### 5. 🛠️ Sandboxed Agentic Tool Execution
+- **Safe AST Calculator**: Mathematical expression evaluator using Abstract Syntax Trees (`ast.parse`) with exponent/memory caps—**never uses unsafe `eval()`**.
+- **DuckDuckGo Web Search**: Real-time web retrieval with automatic source URL citation.
+- **Isolated Python Runner**: Subprocess execution with scrubbed environment variables, 20-second timeout, memory safeguards, and automatic Matplotlib plot extraction (`out_*.png` → base64 data URIs).
+- **Prompt Injection Guard**: Strict mutual exclusion prevents co-enabling web search and the Python runner to prevent indirect prompt steering.
+
+### 6. 🚀 Judge & Demo Presentation Mode
+- **Live Telemetry Strip**: Displays real-time `tok/s`, `TTFT (ms)`, `Total Latency (s)`, `Persona Tag`, and `Commercial Cost Saved` under every message bubble.
+- **Lifetime Zero-Cost Counter**: Tracks lifetime tokens served at $0.00 vs the commercial GPT-4o equivalent cost.
+- **Live Failover Simulation**: Sidebar toggle (`⚡ Simulate Primary Outage`) deliberately faults the primary provider to demonstrate zero-downtime recovery live in front of judges.
+- **1-Click Hackathon Demo Loader**: Preloads Marathi rural health guidelines into ChromaDB, sets up 3 pre-titled showcase sessions, and activates the MahaArogya persona with one click.
+- **60-Second Guided Tour**: Interactive 4-step walkthrough for 3-minute hackathon demo slots.
 
 ---
 
-## 🚀 Quick Start Guide
+## ⚡ Supported Free Engines & Models
+
+| Engine | Primary Models | Context Window | Speed | Cost |
+| :--- | :--- | :--- | :--- | :--- |
+| **⚡ Groq LPU** | `qwen/qwen3.8-27b`, `openai/gpt-oss-120b` | 131K tokens | **~350 – 450 tok/s** | **$0.00 (Free Tier)** |
+| **✨ Google Gemini** | `gemini-3.8-flash`, `gemini-3.5-flash-lite` | **1,000,000 tokens** | ~180 – 220 tok/s | **$0.00 (Free Tier)** |
+| **🧠 OpenRouter** | `nvidia/nemotron-3.5-lightning:free` | 64K tokens | ~70 – 140 tok/s | **$0.00 (Free Tier)** |
+| **🚀 Colab T4 Bridge** | `colab_llm_server.py` (Ollama + Cloudflare Tunnel) | Custom | 16GB Dedicated VRAM | **$0.00 (Free Tier)** |
+
+---
+
+## 🚀 Quick Start in 3 Commands
 
 ### 1. Clone & Set Up Environment
 ```bash
-# Clone the repository
 git clone https://github.com/ankush-dev-eng/ai-hub.git
 cd ai-hub
-
-# Create and activate virtual environment
 python -m venv .venv
 
 # Windows
 .venv\Scripts\activate
-
 # macOS / Linux
 source .venv/bin/activate
 
-# Install dependencies with uv (or pip)
 pip install -r requirements.txt
 ```
 
-### 2. Configure Credentials (Zero Credit Card Required)
+### 2. Configure Free API Keys
 Create a `.env` file in the project root:
 ```env
-# Free at https://aistudio.google.com/
-GEMINI_API_KEY=your_gemini_api_key
-
-# Free at https://console.groq.com/
-GROQ_API_KEY=your_groq_api_key
-
-# Free at https://openrouter.ai/
-OPENROUTER_API_KEY=your_openrouter_api_key
-
-# Free token at https://huggingface.co/settings/tokens
-HF_TOKEN=your_huggingface_token
+# Free keys (Zero Credit Card Required):
+GROQ_API_KEY=your_groq_api_key        # https://console.groq.com/
+GEMINI_API_KEY=your_gemini_api_key    # https://aistudio.google.com/
+OPENROUTER_API_KEY=your_openrouter_key # https://openrouter.ai/
+ENABLE_PYTHON_TOOL=1
 ```
 
 ### 3. Launch the Studio
 ```bash
 streamlit run app.py
 ```
-Or double-click `Start_Hackathon_Hub.bat` on Windows.
+*Access the studio in your browser at `http://localhost:8502`.*
 
 ---
 
-## 🌐 Universal 1-Click Cloud Deployment
+## 🎭 2-Minute Hackathon Demo Script
 
-Deploying multiple hackathon projects often fails when Streamlit Cloud defaults to expecting `app.py` in the root folder, while projects like `NiveshRakshak` house their primary file in subdirectories (`backend/main.py`).
+For a high-impact 2-minute judging presentation:
 
-**AI Hub solves this automatically:**
-1. Navigate to **↗ Deployment & Guide** in the studio navigation.
-2. Select any repository from your GitHub roster (or click **🔄 Refresh Repos** to fetch your latest repositories live).
-3. AI Hub queries the GitHub tree and automatically lists all real `.py` entrypoints.
-4. Click **🚀 Deploy Live on Streamlit Cloud** to open the pre-configured deployment flow with zero missing-file errors!
-
----
-
-## 🎨 Design System & Aesthetics
-
-* **Base Canvas:** Deep Cyber Ink (`#07080d`) with translucent backdrop blur (`rgba(14, 18, 28, 0.45)`).
-* **Typography:** `Space Grotesk` (display & hero branding), `Inter` (body copy), and `JetBrains Mono` (telemetry & code).
-* **Atmospheric Lighting:** Cursor-following spotlight with tab-reactive color pairs:
-  * **Tab 1 (Conversational Studio):** Electric Indigo (`#6366f1`) → Telemetry Cyan (`#22d3ee`)
-  * **Tab 2 (Visual Auditor):** Deep Violet (`#a855f7`) → Neon Fuchsia (`#ec4899`)
-  * **Tab 3 (Media Studio):** Neon Fuchsia (`#ec4899`) → Warm Amber (`#fbbf24`)
-  * **Tab 4 (Cloud Deployment):** Emerald Mint (`#34d399`) → Telemetry Cyan (`#22d3ee`)
+| Time | Stage Action | What Judges See & Hear |
+| :--- | :--- | :--- |
+| **0:00 - 0:20** | Click **✨ Load Demo Data** in the sidebar | Preloads MahaArogya persona, Marathi health guidelines into ChromaDB, and opens the pre-populated emergency session. Zero fumbling on stage! |
+| **0:20 - 0:50** | Click **🔊 Replay Voice** or speak a question in Marathi | Real-time neural Marathi voice (`AarohiNeural`) explains emergency triage, directing urgent cases to **108/112**. |
+| **0:50 - 1:20** | Hover over **`🟢 [1] maharashtra_phc_protocols.pdf · 96% ✓`** | Interactive popover opens showing exact page number (p.1), relevance score bar, and source snippet. Proves hallucination-free grounded RAG. |
+| **1:20 - 1:45** | Flip **⚡ Simulate Primary Outage** in the sidebar & ask a question | Groq triggers a simulated 503 outage; Gemini Flash seamlessly takes over in real time with zero disruption or error dialogues! |
+| **1:45 - 2:00** | Point to the **Zero-Cost Counter** & **Live Telemetry** | Highlights **420+ tok/s**, **105ms TTFT**, and **$0.00 spent** ($50+ commercial equivalent saved). Easy for judges to remember! |
 
 ---
 
-## 🛡️ Privacy & Security
-* All API keys are loaded locally from `.env` and excluded from git tracking.
-* In public mode (`STUDIO_PUBLIC_MODE = "1"`), API keys and session states are sandboxed to protect creator credentials.
-* Zero telemetry is transmitted to third-party tracking services.
+## 🛡️ Security & Privacy
+* **Zero Cloud Lock-in**: All chat sessions and citations are stored locally in SQLite WAL mode (`chat_data/history.db`).
+* **Subprocess Isolation**: The Python execution tool uses a clean environment with all API keys scrubbed, file size caps, and a hard 20-second process termination.
+* **Prompt Injection Defense**: Uploaded documents and web search results are marked as untrusted data in the system prompt. Web search and Python execution are strictly mutually exclusive.
 
 ---
 

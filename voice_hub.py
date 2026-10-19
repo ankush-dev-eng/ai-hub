@@ -144,6 +144,22 @@ def sidebar(default_voice: str | None = None) -> dict:
     return {"mode": mode, "voice": voice, "rate": f"{rate:+d}%", "lang": lang}
 
 
+def replay_audio(text: str, cfg: dict):
+    """Enqueues audio playback for an existing message into the parent audio queue."""
+    clean = speakable(text)
+    if not clean:
+        return
+    voice = cfg.get("voice", "en-IN-NeerjaNeural")
+    if re.search(r"[\u0900-\u097F]", clean) and not voice.startswith(("hi-", "mr-")):
+        voice = "hi-IN-SwaraNeural"
+    try:
+        audio = synth(clean, voice, cfg.get("rate", "+0%"))
+        b64 = base64.b64encode(audio).decode("ascii")
+        _run_js(f"window.parent.__ttsq && window.parent.__ttsq.push('{b64}');")
+    except Exception as e:
+        st.toast(f"Audio replay failed: {str(e)[:60]}", icon="🔇")
+
+
 def mic_input(cfg: dict):
     """Render recorder (put inside the dock toolbar). Returns transcript once per recording."""
     ss = st.session_state

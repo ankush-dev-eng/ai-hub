@@ -59,8 +59,14 @@ def ensure_session():
 def sidebar():
     ss, sb = st.session_state, st.sidebar
     sb.markdown("### 💬 Chats")
-    if sb.button("➕ New chat", use_container_width=True):
+    c_new, c_demo = sb.columns([1, 1])
+    if c_new.button("➕ New", use_container_width=True):
         _switch(None)
+        st.rerun()
+    if c_demo.button("✨ Demo", use_container_width=True, help="Load hackathon demo chats & guidelines"):
+        import judge_hub as jh
+        jh.load_demo_data()
+        _switch("demo_mahaarogya_phc")
         st.rerun()
     q = sb.text_input("Search chats", placeholder="Search titles and messages...", label_visibility="collapsed")
     rows = hdb.list_sessions(q)
