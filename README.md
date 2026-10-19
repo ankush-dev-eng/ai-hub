@@ -175,11 +175,12 @@ For a high-impact 2-minute judging presentation:
 
 | Time | Stage Action | What Judges See & Hear |
 | :--- | :--- | :--- |
-| **0:00 - 0:20** | Click **✨ Demo** (or ✨ Load Domain Demos) in the sidebar | Preloads Healthcare, Security & Education domain chats and first-aid protocols into ChromaDB. Healthcare Domain active with zero fumbling on stage! |
-| **0:20 - 0:50** | Click **🔊 Replay Voice** or ask a triage question | Real-time neural Marathi voice (`AarohiNeural`) explains emergency triage, directing urgent cases to **108/112** with non-diagnostic guardrails. |
-| **0:50 - 1:20** | Hover over **`🟢 [1] health_first_aid_protocols.pdf · 96% ✓`** | Interactive popover opens showing exact page number (p.1), relevance score bar, and source snippet. Proves hallucination-free grounded RAG. |
-| **1:20 - 1:45** | Flip **⚡ Simulate Primary Outage** & click prompt chip **`💡 'उष्माघात...'`** | Groq triggers a simulated 503 outage; secondary provider (Gemini Flash) takes over in real time with zero error alerts! |
-| **1:45 - 2:00** | Point to the **Zero-Cost Counter** & **Live Telemetry** | Reads live metrics on screen (active provider, speed, TTFT, and **$0.00 spent** with commercial equivalent saved). Verifiable proof of reliability! |
+| **0:00 - 0:25** | Point to **Healthcare Domain** chat (preloaded via **`✨ Demo`**) | Introduces the real-world problem: accessible rural first-aid advice in Marathi/Hindi running on free tiers with a local-model option. |
+| **0:25 - 0:50** | Click **`🔊 Replay Voice`** under the assistant's reply | Real-time neural Marathi voice (`AarohiNeural`) speaks first-aid seating advice and immediate escalation to **108/112** without prescribing medication. |
+| **0:50 - 1:30** | Flip **`⚡ Simulate Primary Outage`** & click **`💡 'उष्माघात...'`** chip | Primary provider faults behind the scenes; secondary provider (Gemini Flash) routes automatically and streams advice with no error alerts. |
+| **1:30 - 1:50** | Click the live citation badge beneath the streaming reply | Popover opens displaying page number, relevance score derived from vector distance, and the underlying first-aid source chunk. |
+| **1:50 - 2:05** | Point to the **Zero-Cost Counter** & **Live Telemetry Strip** | Read live metrics on screen (serving provider, tok/s, TTFT) and lifetime **$0.00 spent** ($50+ commercial equivalent saved). |
+| **2:05 - 2:20** | Click **`🛡️ Security Domain`** in sidebar chat list | Shows the exact same multi-provider engine, restricted tools, and local RAG serving an entirely different domain in one click. |
 
 ---
 
