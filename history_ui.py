@@ -66,7 +66,7 @@ def sidebar():
     if c_demo.button("✨ Demo", use_container_width=True, help="Load hackathon demo chats & guidelines"):
         import judge_hub as jh
         jh.load_demo_data()
-        _switch("demo_mahaarogya_phc")
+        _switch("demo_healthcare")
         st.rerun()
     q = sb.text_input("Search chats", placeholder="Search titles and messages...", label_visibility="collapsed")
     rows = hdb.list_sessions(q)

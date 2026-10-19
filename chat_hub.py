@@ -476,7 +476,7 @@ def render_chat():
         with col_mic:
             spoken = voice_hub.mic_input(vcfg)
         with col_chip:
-            if persona.id == "mahaarogya":
+            if persona.id in ("healthcare", "mahaarogya"):
                 if st.button("💡 'उष्माघात झाल्यावर काय करावे?' (Ask Heat Stroke)", key="chip_heat", help="1-click demo query for failover test"):
                     chip_prompt = "उष्माघात झाल्यावर प्राथमिक उपचार काय करावेत?"
 

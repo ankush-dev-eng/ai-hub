@@ -149,49 +149,49 @@ def render_failover_toggle():
 # --------------------------------------------------------------------------- #
 TOUR_STEPS = [
     {
-        "title": "1. Multilingual Neural Voice (Marathi / Hindi)",
+        "title": "1. Healthcare Domain: Multilingual Voice Triage",
         "desc": "Voice-first synthesis with Edge-TTS and Groq Whisper STT.",
         "prompt": "तुम्ही कोण आहात आणि तुम्ही मला कशी मदत करू शकता? (Who are you and how can you help me?)",
-        "mock_response": "मी AI Hub आहे—एक मल्टी-प्रोव्हायडर, झिरो-कॉस्ट एआय स्टुडिओ. मी रिअल-टाइम व्हॉइस, डॉक्युमेंट आरएजी, आणि कोड रनिंग सपोर्ट करतो.",
+        "mock_response": "मी एक मल्टी-प्रोव्हायडर, झिरो-कॉस्ट एआय सहाय्यक आहे. मी रिअल-टाइम व्हॉइस, डॉक्युमेंट आरएजी, आणि कोड रनिंग सपोर्ट करतो.",
         "tool_tag": "🎙️ Edge-TTS · mr-IN-AarohiNeural (Marathi)",
     },
     {
-        "title": "2. Zero-Cost Document RAG (Local ChromaDB)",
+        "title": "2. Healthcare Domain: Grounded Document RAG",
         "desc": "Local ONNX MiniLM vector embeddings on CPU with citations.",
-        "prompt": "What are the core technical capabilities of the AI Studio according to the documentation?",
-        "mock_response": "According to the indexed architecture specification:\n1. **Unified Multi-Provider LPU**: Real-time streaming via Groq Qwen 3.8 and Gemini 3.8 Flash.\n2. **Local Vector RAG**: Fully offline document chunking and semantic search with ChromaDB.\n3. **Safe Subprocess Runner**: Code execution with Matplotlib auto-render.\n4. **Zero-Downtime Failover**: Instant fallback chain across providers.",
-        "tool_tag": "📚 ChromaDB Vector Search · all-MiniLM-L6-v2 (Top 3 Chunks Retrieved)",
+        "prompt": "What are the first-aid steps for emergency triage according to the health guidelines?",
+        "mock_response": "According to the indexed health guidelines [1]:\n1. **Emergency Contact**: Immediately call 108 or 112 for acute chest pain or breathing distress [1].\n2. **Patient Positioning**: Keep the patient seated and calm; do not force fluids [1].\n3. **Ambulance Transport**: Transfer to the nearest PHC or hospital without delay [2].",
+        "tool_tag": "📚 ChromaDB Vector Search · all-MiniLM-L6-v2 (Top Chunks Retrieved)",
     },
     {
-        "title": "3. Agentic Tool Execution (Search + Python Plot)",
+        "title": "3. Security & Code Domain: Tool Execution",
         "desc": "Safe AST calculator, DuckDuckGo search, and Matplotlib code runner.",
         "prompt": "Calculate 45 * 123 + sqrt(9801) and plot a Gaussian distribution curve in Python.",
         "mock_response": "1. **Calculator Result**: `45 * 123 + sqrt(9801) = 5535 + 99 = 5634`\n2. **Python Execution Output**: Generated standard normal distribution curve over [-4, 4] with $\\mu=0, \\sigma=1$.\n3. Plot auto-captured and rendered to the user.",
         "tool_tag": "🛠️ Tools: calculator + run_python (20s limit)",
     },
     {
-        "title": "4. Model Arena Side-by-Side Benchmark",
+        "title": "4. Education Domain: Multi-Model Benchmark",
         "desc": "Broadcasts same prompt to 2 models simultaneously to compare speed & reasoning.",
         "prompt": "Explain quantum superposition in 2 sentences.",
         "mock_response_a": "Quantum superposition allows a physical system to exist simultaneously in a linear combination of multiple distinct quantum states. It collapses into a single definite observable state only upon measurement.",
         "mock_response_b": "In quantum mechanics, a particle like an electron exists across probabilities rather than a single fixed location until observed. This enables quantum computers to evaluate vast computational paths concurrently.",
-        "tool_tag": "⚔️ Arena: Groq Qwen 3.8 27B (420 tok/s) vs Gemini 3.8 Flash (190 tok/s)",
+        "tool_tag": "⚔️ Arena: Groq Qwen 3.8 27B vs Gemini 3.8 Flash",
     },
 ]
 
 
 def load_demo_data():
     """One-click preload for hackathon judges: pre-indexes health guidelines into ChromaDB,
-    creates 3 demo chats in SQLite, and switches to MahaArogya persona."""
+    creates domain demo chats in SQLite, and switches to Healthcare domain persona."""
     import history_db as hdb
     import rag_cite
 
     hdb.init()
-    demo_sid = "demo_mahaarogya_phc"
+    demo_sid = "demo_healthcare"
 
     # 1. Create or ensure demo sessions exist
     if not hdb.session_exists(demo_sid):
-        hdb.new_session("🩺 MahaArogya Rural Health Guidance", sid=demo_sid)
+        hdb.new_session("🩺 Healthcare Domain: Emergency First Aid & Triage", sid=demo_sid)
         hdb.add_message(demo_sid, "user", "माझ्या आजोबांना अचानक छातीत तीव्र वेदना होत आहेत आणि भरपूर घाम येत आहे. मी काय करू?",
                         {"display": "माझ्या आजोबांना अचानक छातीत तीव्र वेदना होत आहेत आणि भरपूर घाम येत आहे. मी काय करू?"})
         ans_text = ("⚠️ **तातडीचा इशारा**: ही गंभीर वैद्यकीय आणीबाणी (संभाव्य हृदयविकाराचा झटका) असू शकते! [1]\n\n"
@@ -202,22 +202,22 @@ def load_demo_data():
         m_id = hdb.add_message(demo_sid, "assistant", ans_text, {
             "used": "Groq · qwen/qwen3.8-27b",
             "telemetry": {
-                "used": "Groq LPU", "persona": "🩺 MahaArogya Rural Health Assistant",
+                "used": "Groq LPU", "persona": "🩺 Healthcare & Medical Triage Domain",
                 "tokens": 142, "ttft_ms": 105.4, "total_time_s": 0.38, "tool_time_s": 0.0,
                 "tok_per_sec": 425.2, "cost_saved": 0.0014, "ts": time.time()
             }
         })
         cits = [
-            rag_cite.Citation(1, "maharashtra_phc_protocols.pdf", "phc_chunk_1", 0.08, 0.96,
+            rag_cite.Citation(1, "health_first_aid_protocols.pdf", "phc_chunk_1", 0.08, 0.96,
                               "हृदयविकार किंवा छातीत तीव्र वेदना असल्यास त्वरित १०८ रुग्णवाहिका किंवा जवळच्या PHC केंद्राशी संपर्क साधावा. रुग्णाला बसवून ठेवावे.", 1),
-            rag_cite.Citation(2, "national_health_mission_guide.pdf", "nhm_chunk_3", 0.16, 0.92,
-                              "महाराष्ट्र राज्य आरोग्य हमी योजना व राष्ट्रीय आरोग्य अभियानांतर्गत १०८ आणि १०४ आपत्कालीन रुग्णवाहिका सेवा मोफत उपलब्ध आहे.", 3),
+            rag_cite.Citation(2, "national_emergency_health_guide.pdf", "nhm_chunk_3", 0.16, 0.92,
+                              "राष्ट्रीय आरोग्य अभियानांतर्गत १०८ आणि १०४ आपत्कालीन रुग्णवाहिका सेवा मोफत उपलब्ध आहे.", 3),
         ]
         rag_cite.save_citations(m_id, cits)
 
-    sec_sid = "demo_security_audit"
+    sec_sid = "demo_security"
     if not hdb.session_exists(sec_sid):
-        hdb.new_session("🛡️ Code Security Audit: SQL Injection", sid=sec_sid)
+        hdb.new_session("🛡️ Security Domain: SQL Injection Vulnerability Audit", sid=sec_sid)
         hdb.add_message(sec_sid, "user", "Audit this database query function for vulnerabilities:\ndef get_user(uid): return db.execute(f'SELECT * FROM users WHERE id = {uid}').fetchone()",
                         {"display": "Audit this database query function for vulnerabilities"})
         sec_ans = ("### 🛡️ Security Audit Findings\n\n"
@@ -230,23 +230,23 @@ def load_demo_data():
         hdb.add_message(sec_sid, "assistant", sec_ans, {
             "used": "Groq · qwen/qwen3.8-27b · tools",
             "telemetry": {
-                "used": "Groq LPU", "persona": "🛡️ Code Auditor",
+                "used": "Groq LPU", "persona": "🛡️ Software & Cybersecurity Domain",
                 "tokens": 168, "ttft_ms": 112.0, "total_time_s": 0.42, "tool_time_s": 0.0,
                 "tok_per_sec": 410.0, "cost_saved": 0.0017, "ts": time.time()
             }
         })
 
-    viva_sid = "demo_technical_viva"
+    viva_sid = "demo_education"
     if not hdb.session_exists(viva_sid):
-        hdb.new_session("🎓 Technical Viva: Transformer Attention", sid=viva_sid)
+        hdb.new_session("🎓 Education Domain: Transformer Architecture Viva", sid=viva_sid)
         hdb.add_message(viva_sid, "user", "Start my technical viva on Transformer architecture.",
                         {"display": "Start my technical viva on Transformer architecture."})
-        viva_ans = ("Welcome to your technical viva. Let's begin at medium difficulty.\n\n"
+        viva_ans = ("Welcome to your technical viva examination.\n\n"
                     "**Question 1**: Explain why the dot product in Scaled Dot-Product Attention is scaled by 1/sqrt(d_k), and what happens to the softmax gradients when d_k becomes very large without this scaling?")
         hdb.add_message(viva_sid, "assistant", viva_ans, {
             "used": "Groq · qwen/qwen3.8-27b",
             "telemetry": {
-                "used": "Groq LPU", "persona": "🎓 Viva / Technical Examiner",
+                "used": "Groq LPU", "persona": "🎓 Education & Technical Exam Domain",
                 "tokens": 78, "ttft_ms": 98.0, "total_time_s": 0.22, "tool_time_s": 0.0,
                 "tok_per_sec": 395.0, "cost_saved": 0.0008, "ts": time.time()
             }
@@ -259,14 +259,14 @@ def load_demo_data():
         coll = client.get_or_create_collection(f"rag_{demo_sid[:40]}")
         if coll.count() == 0:
             docs = [
-                "महाराष्ट्र शासन सार्वजनिक आरोग्य विभाग: छातीत तीव्र वेदना, श्वास घेण्यात अडचण किंवा बेशुद्ध पडणे या गंभीर लक्षणांसाठी त्वरित १०८ रुग्णवाहिका बोलवावी. प्राथमिक आरोग्य केंद्रात (PHC) प्रथमोपचार उपलब्ध असतात.",
-                "राष्ट्रीय आरोग्य अभियान (NHM): १०८ रुग्णवाहिका २४ तास मोफत उपलब्ध आहे. १०४ हेल्पलाइनवर मोफत वैद्यकीय सल्ला मिळतो. सर्पदंश, हृदयविकार, आणि प्रसूतीसाठी मोफत सेवा.",
+                "सार्वजनिक आरोग्य विभाग: छातीत तीव्र वेदना, श्वास घेण्यात अडचण किंवा बेशुद्ध पडणे या गंभीर लक्षणांसाठी त्वरित १०८ रुग्णवाहिका बोलवावी. प्राथमिक आरोग्य केंद्रात (PHC) प्रथमोपचार उपलब्ध असतात.",
+                "राष्ट्रीय आरोग्य अभियान: १०८ रुग्णवाहिका २४ तास मोफत उपलब्ध आहे. १०४ हेल्पलाइनवर मोफत वैद्यकीय सल्ला मिळतो. सर्पदंश, हृदयविकार, आणि प्रसूतीसाठी मोफत सेवा.",
                 "उष्माघात (Heat Stroke) प्राथमिक उपचार: रुग्णाला थंड व सावलीच्या जागी आणावे. ओल्या कपड्याने शरीर पुसावे. ओआरएस (ORS) किंवा लिंबू पाणी द्यावे. तीव्र ताप असल्यास ताबडतोब PHC मध्ये न्यावे.",
                 "अतिसार व डिहायड्रेशन: वारंवार ओआरएस (ORS) पाणी प्यावे. हलका आहार घ्यावा. बालकांमध्ये डिहायड्रेशनची लक्षणे दिसल्यास तातडीने आशा स्वयंसेविका किंवा अंगणवाडी सेविकेशी संपर्क साधावा."
             ]
             metas = [
-                {"source": "maharashtra_phc_protocols.pdf", "filename": "maharashtra_phc_protocols.pdf", "page": 1, "chunk_idx": 0},
-                {"source": "national_health_mission_guide.pdf", "filename": "national_health_mission_guide.pdf", "page": 3, "chunk_idx": 1},
+                {"source": "health_first_aid_protocols.pdf", "filename": "health_first_aid_protocols.pdf", "page": 1, "chunk_idx": 0},
+                {"source": "national_emergency_health_guide.pdf", "filename": "national_emergency_health_guide.pdf", "page": 3, "chunk_idx": 1},
                 {"source": "summer_heatwave_advisory.pdf", "filename": "summer_heatwave_advisory.pdf", "page": 1, "chunk_idx": 2},
                 {"source": "rural_maternal_child_care.pdf", "filename": "rural_maternal_child_care.pdf", "page": 2, "chunk_idx": 3},
             ]
@@ -276,9 +276,9 @@ def load_demo_data():
         pass
 
     st.session_state["sid"] = demo_sid
-    st.session_state["persona_id"] = "mahaarogya"
+    st.session_state["persona_id"] = "healthcare"
     st.query_params["s"] = demo_sid
-    st.toast("🎉 Loaded 3 demo chats & indexed guidelines! MahaArogya ready.", icon="🚀")
+    st.toast("🎉 Loaded domain demo chats & guidelines! Healthcare Domain active.", icon="🚀")
 
 
 def render_tour_panel():

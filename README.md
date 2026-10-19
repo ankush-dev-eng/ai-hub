@@ -50,7 +50,7 @@ flowchart TD
     end
 
     subgraph "🧠 Conversational & Persona Hub"
-        UI --> Persona["🎭 Persona Engine (MahaArogya, Examiner, Code Auditor)"]
+        UI --> Persona["🎭 Persona Engine (Healthcare, Security, Education, Finance)"]
         Persona --> Router["⚡ Unified Multi-Provider Failover Router"]
         
         Router --> Groq["⚡ Groq LPU (~350–450 tok/s)<br/>Qwen 3.8 27B · GPT-OSS"]
@@ -101,12 +101,13 @@ flowchart TD
 - **Interactive Badges**: Color-coded relevance badges (`🟢 >=50%`, `🟡 >=35%`, `🔴 <35%`) with checkmarks (`✓`) indicating which sources were cited. Clicking opens popover previews with chunk text, page number, and distance metrics.
 - **Untrusted Context Guard**: Built-in prompt defense prevents prompt injection attacks from malicious uploaded files.
 
-### 4. 🎭 Specialized Hackathon Persona Presets
-- **🩺 MahaArogya Rural Health Assistant**: Marathi/Hindi-first village health guidance, 108/112 emergency escalation protocols, home-care basics, and strict no-diagnosis safety guards.
-- **🎓 Viva / Technical Examiner**: Quizzes students one question at a time, grades answers out of 10, provides diagnostic feedback, and dynamically scales difficulty.
-- **🛡️ Defensive Code Auditor**: Identifies critical vulnerabilities (SQLi, XSS, SSRF, race conditions) and provides verified drop-in remediation patches.
-- **💬 General Assistant**: Balanced everyday assistant with web search and calculator.
-- **Custom Persona Builder**: Sidebar expander to create and persist custom personas (`chat_data/personas.json`).
+### 4. 🎭 Specialized Domain Persona Presets
+- **🩺 Healthcare & Medical Triage Domain**: First-aid triage and rural health guidance in Marathi, Hindi & English. Strict non-diagnostic guardrails, 108/112 emergency escalation protocols.
+- **🎓 Education & Technical Exam Domain**: Interactive oral viva exam quizzes, automated grading out of 10, diagnostic feedback, and dynamic difficulty scaling.
+- **🛡️ Software & Cybersecurity Domain**: Defensive code auditing, vulnerability identification (CWE/OWASP), and concrete drop-in remediation patches.
+- **📈 Finance & Risk Analysis Domain**: Portfolio risk analysis, mathematical valuation, and financial document inspection.
+- **💬 General Purpose Domain**: Balanced everyday assistant with live web search and safe calculation.
+- **Custom Persona Builder**: Sidebar expander to create, edit, and persist custom domain personas (`chat_data/personas.json`).
 
 ### 5. 🛠️ Sandboxed Agentic Tool Execution
 - **Safe AST Calculator**: Mathematical expression evaluator using Abstract Syntax Trees (`ast.parse`) with exponent/memory caps—**never uses unsafe `eval()`**.
@@ -115,10 +116,10 @@ flowchart TD
 - **Prompt Injection Guard**: Strict mutual exclusion prevents co-enabling web search and the Python runner to prevent indirect prompt steering.
 
 ### 6. 🚀 Judge & Demo Presentation Mode
-- **Live Telemetry Strip**: Displays real-time `tok/s`, `TTFT (ms)`, `Total Latency (s)`, `Persona Tag`, and `Commercial Cost Saved` under every message bubble.
+- **Live Telemetry Strip**: Displays real-time `tok/s`, `TTFT (ms)`, `Total Latency (s)`, `Active Provider`, `Domain Persona Tag`, and `Commercial Cost Saved` under every message bubble.
 - **Lifetime Zero-Cost Counter**: Tracks lifetime tokens served at $0.00 vs the commercial GPT-4o equivalent cost.
-- **Live Failover Simulation**: Sidebar toggle (`⚡ Simulate Primary Outage`) deliberately faults the primary provider to demonstrate zero-downtime recovery live in front of judges.
-- **1-Click Hackathon Demo Loader**: Preloads Marathi rural health guidelines into ChromaDB, sets up 3 pre-titled showcase sessions, and activates the MahaArogya persona with one click.
+- **Live Failover Simulation**: Sidebar toggle (`⚡ Simulate Primary Outage`) deliberately faults the primary provider to demonstrate automated recovery live in front of judges.
+- **1-Click Domain Demo Loader**: Preloads first-aid protocols into ChromaDB, sets up 3 pre-titled domain showcase sessions (Healthcare, Security, Education), and activates the Healthcare domain persona with one click.
 - **60-Second Guided Tour**: Interactive 4-step walkthrough for 3-minute hackathon demo slots.
 
 ---
@@ -174,11 +175,11 @@ For a high-impact 2-minute judging presentation:
 
 | Time | Stage Action | What Judges See & Hear |
 | :--- | :--- | :--- |
-| **0:00 - 0:20** | Click **✨ Load Demo Data** in the sidebar | Preloads MahaArogya persona, Marathi health guidelines into ChromaDB, and opens the pre-populated emergency session. Zero fumbling on stage! |
-| **0:20 - 0:50** | Click **🔊 Replay Voice** or speak a question in Marathi | Real-time neural Marathi voice (`AarohiNeural`) explains emergency triage, directing urgent cases to **108/112**. |
-| **0:50 - 1:20** | Hover over **`🟢 [1] maharashtra_phc_protocols.pdf · 96% ✓`** | Interactive popover opens showing exact page number (p.1), relevance score bar, and source snippet. Proves hallucination-free grounded RAG. |
-| **1:20 - 1:45** | Flip **⚡ Simulate Primary Outage** in the sidebar & ask a question | Groq triggers a simulated 503 outage; Gemini Flash seamlessly takes over in real time with zero disruption or error dialogues! |
-| **1:45 - 2:00** | Point to the **Zero-Cost Counter** & **Live Telemetry** | Highlights **420+ tok/s**, **105ms TTFT**, and **$0.00 spent** ($50+ commercial equivalent saved). Easy for judges to remember! |
+| **0:00 - 0:20** | Click **✨ Demo** (or ✨ Load Domain Demos) in the sidebar | Preloads Healthcare, Security & Education domain chats and first-aid protocols into ChromaDB. Healthcare Domain active with zero fumbling on stage! |
+| **0:20 - 0:50** | Click **🔊 Replay Voice** or ask a triage question | Real-time neural Marathi voice (`AarohiNeural`) explains emergency triage, directing urgent cases to **108/112** with non-diagnostic guardrails. |
+| **0:50 - 1:20** | Hover over **`🟢 [1] health_first_aid_protocols.pdf · 96% ✓`** | Interactive popover opens showing exact page number (p.1), relevance score bar, and source snippet. Proves hallucination-free grounded RAG. |
+| **1:20 - 1:45** | Flip **⚡ Simulate Primary Outage** & click prompt chip **`💡 'उष्माघात...'`** | Groq triggers a simulated 503 outage; secondary provider (Gemini Flash) takes over in real time with zero error alerts! |
+| **1:45 - 2:00** | Point to the **Zero-Cost Counter** & **Live Telemetry** | Reads live metrics on screen (active provider, speed, TTFT, and **$0.00 spent** with commercial equivalent saved). Verifiable proof of reliability! |
 
 ---
 
