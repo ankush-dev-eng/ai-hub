@@ -11,8 +11,15 @@ Provides:
 import time
 import uuid
 import base64
+import re
+import io
+import sys
 from pathlib import Path
 from typing import Callable, Iterator, Union, List, Dict, Any
+
+_SRC_PATH = str(Path(__file__).parent / "src")
+if _SRC_PATH not in sys.path:
+    sys.path.insert(0, _SRC_PATH)
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -21,10 +28,10 @@ import streamlit.components.v1 as components
 # 0. Navigation & Models Configuration
 # --------------------------------------------------------------------------- #
 NAV = [
-    "⚡ Conversational Studio",
-    "◈ Visual & Document Auditor",
-    "✦ Free Image & Video Studio",
-    "↗ Deployment & Guide",
+    "💬 Chat",
+    "◈ Auditor",
+    "🎨 Studio",
+    "🚀 Deploy",
 ]
 
 MODELS: List[Dict[str, Any]] = [
@@ -76,10 +83,10 @@ PROVIDER_EMOJI = {
 LOGO_DIR = Path("assets/logos")
 
 STARTERS = {
-    "✦ Pitch": "Write a 60-second hackathon pitch for this project.",
-    "⬡ Arch Flow": "Draw the architecture flow for this project as a clean Mermaid flowchart TD with quoted labels.",
-    "◈ Code Review": "Review the attached code for bugs, security issues, performance bottlenecks, and quick wins.",
-    "⚡ Fast MVP": "Give me the fastest 24-hour MVP build plan with an actionable task split for 3 engineers.",
+    "Write pitch strategy": "Write a 60-second hackathon pitch for this project with target audience, problem, solution, and business model.",
+    "Draft architecture flow": "Draw the architecture flow for this project as a clean Mermaid flowchart TD with quoted labels.",
+    "Review code for vulnerabilities": "Review the attached code for bugs, security issues, performance bottlenecks, and quick wins.",
+    "Create 24h MVP roadmap": "Give me the fastest 24-hour MVP build plan with an actionable task split for 3 engineers.",
 }
 
 # --------------------------------------------------------------------------- #
@@ -90,10 +97,10 @@ CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root{
-  --bg:#0c0e14; --panel:#141721; --panel-2:#161922; --line:#232838;
-  --line-soft:rgba(255,255,255,.08); --accent:#6366f1;
-  --accent-soft:rgba(99,102,241,.14); --text:#e6e8ef; --muted:#8b91a5;
-  --ease:150ms ease;
+  --bg:#09090b; --panel:#141417; --panel-2:#18181b; --line:rgba(255,255,255,.08);
+  --line-soft:rgba(255,255,255,.06); --accent:#ffffff;
+  --accent-soft:rgba(255,255,255,.08); --text:#f4f4f5; --muted:#a1a1aa;
+  --ease:120ms cubic-bezier(0.16, 1, 0.3, 1);
   --dock-h:5.5rem;
 }
 
@@ -119,16 +126,23 @@ header[data-testid="stHeader"],
 [data-testid="stToolbar"] {
   pointer-events: none !important;
 }
-[data-testid="stToolbar"] > * {
+[data-testid="stToolbarActions"],
+[data-testid="stToolbarActions"] *,
+[data-testid="stAppDeployButton"],
+[data-testid="stAppDeployButton"] *,
+[data-testid="stMainMenu"],
+[data-testid="stMainMenu"] *,
+button[data-testid="stBaseButton-header"] {
   pointer-events: auto !important;
 }
-[data-testid="stSidebar"] {
+[data-testid="stSidebar"],
+section[data-testid="stSidebar"] {
   background: var(--panel) !important;
   border-right: 1px solid var(--line) !important;
-  z-index: 9999 !important;
+  z-index: 1000005 !important;
 }
 [data-testid="stSidebarCollapseButton"] {
-  z-index: 10002 !important;
+  z-index: 1000010 !important;
   pointer-events: auto !important;
   display: flex !important;
 }
@@ -143,7 +157,7 @@ header[data-testid="stHeader"],
   position: fixed !important;
   top: 1rem !important;
   left: 1rem !important;
-  z-index: 10002 !important;
+  z-index: 1000010 !important;
   pointer-events: auto !important;
   display: flex !important;
   background: rgba(18, 22, 34, 0.9) !important;
@@ -151,7 +165,17 @@ header[data-testid="stHeader"],
   border-radius: 8px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
 }
-.block-container{max-width:980px;padding-top:1rem;padding-bottom:7rem}
+[data-testid="stExpandSidebarButton"] button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+.block-container, [data-testid="stMainBlockContainer"] {
+  max-width: 1200px !important;
+  padding-top: 4.5rem !important;
+  padding-bottom: 7rem !important;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+}
 
 /* ---- Full-Width Translucent Glass Segmented Navigation ---- */
 [data-testid="stLayoutWrapper"]:has(.st-key-nav_wrapper),
@@ -174,54 +198,62 @@ header[data-testid="stHeader"],
   background: transparent !important;
   border-bottom: none !important;
   padding: 0 !important;
-  margin: 0 0 0.8rem 0 !important;
+  margin: 0 0 1rem 0 !important;
   box-shadow: none !important;
 }
 
 /* 1. NATIVE st.segmented_control STYLING */
 div[data-testid="stSegmentedControl"],
 .st-key-hub_nav_segmented div[data-testid="stSegmentedControl"] {
-  max-width: 980px !important;
+  max-width: 100% !important;
+  width: 100% !important;
   margin: 0 auto !important;
   display: flex !important;
-  justify-content: center !important;
+  justify-content: stretch !important;
   align-items: center !important;
-  background: rgba(14, 17, 26, 0.45) !important;
+  background: rgba(24, 24, 27, 0.75) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 14px !important;
-  padding: 3px !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+  border-radius: 12px !important;
+  padding: 4px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
 }
 
 div[data-testid="stSegmentedControl"] button {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
   border: 1px solid transparent !important;
-  border-radius: 12px !important;
-  padding: 0.55rem 1.35rem !important;
-  font-size: 0.92rem !important;
+  border-radius: 10px !important;
+  padding: 0.5rem 0.6rem !important;
+  font-size: 0.88rem !important;
   font-weight: 500 !important;
   color: #94a3b8 !important;
   background: transparent !important;
   cursor: pointer !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
   white-space: nowrap !important;
+  text-align: center !important;
 }
 
 div[data-testid="stSegmentedControl"] button:hover {
   color: #ffffff !important;
   background: rgba(255, 255, 255, 0.07) !important;
   border-color: rgba(255, 255, 255, 0.14) !important;
-  transform: translateY(-1px) !important;
+}
+
+div[data-testid="stSegmentedControl"] button:active {
+  transform: scale(0.97) !important;
 }
 
 div[data-testid="stSegmentedControl"] button[aria-checked="true"],
 div[data-testid="stSegmentedControl"] button[aria-selected="true"],
 div[data-testid="stSegmentedControl"] button[data-active="true"] {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(34, 211, 238, 0.3)) !important;
+  background: #27272a !important;
   color: #ffffff !important;
   font-weight: 600 !important;
-  border: 1px solid rgba(99, 102, 241, 0.7) !important;
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-  transform: translateY(0) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: none !important;
 }
 
 /* 2. FALLBACK st.radio STYLING (Eradicates radio circles & raw outlines) */
@@ -231,18 +263,19 @@ div[data-testid="stSegmentedControl"] button[data-active="true"] {
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
-  justify-content: center !important;
+  justify-content: stretch !important;
   align-items: center !important;
-  gap: 0.4rem !important;
-  max-width: 980px !important;
+  gap: 0.35rem !important;
+  width: 100% !important;
+  max-width: 100% !important;
   margin: 0 auto !important;
   padding: 4px !important;
-  background: rgba(14, 18, 28, 0.45) !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  background: rgba(24, 24, 27, 0.75) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 14px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
 }
 
 .st-key-nav_wrapper [role="radiogroup"] input[type="radio"],
@@ -269,20 +302,32 @@ div[data-testid="stSegmentedControl"] button[data-active="true"] {
 .st-key-nav_wrapper [role="radiogroup"] label,
 .st-key-hub_nav_radio [role="radiogroup"] label,
 .st-key-nav [role="radiogroup"] label {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
   margin: 0 !important;
-  padding: 0.55rem 1.35rem !important;
-  border-radius: 12px !important;
+  padding: 0.48rem 0.55rem !important;
+  border-radius: 10px !important;
   cursor: pointer !important;
   color: #94a3b8 !important;
   white-space: nowrap !important;
   border: 1px solid transparent !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  font-size: 0.92rem !important;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  font-size: 0.85rem !important;
   font-weight: 500 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   user-select: none !important;
+  text-align: center !important;
+}
+
+.st-key-nav_wrapper [role="radiogroup"] label *,
+.st-key-hub_nav_radio [role="radiogroup"] label *,
+.st-key-nav [role="radiogroup"] label *,
+div[data-testid="stSegmentedControl"] button * {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
 }
 
 .st-key-nav_wrapper [role="radiogroup"] label:hover,
@@ -291,18 +336,22 @@ div[data-testid="stSegmentedControl"] button[data-active="true"] {
   background: rgba(255, 255, 255, 0.07) !important;
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.14) !important;
-  transform: translateY(-1px) !important;
+}
+
+.st-key-nav_wrapper [role="radiogroup"] label:active,
+.st-key-hub_nav_radio [role="radiogroup"] label:active,
+.st-key-nav [role="radiogroup"] label:active {
+  transform: scale(0.97) !important;
 }
 
 .st-key-nav_wrapper [role="radiogroup"] label:has(input:checked),
 .st-key-hub_nav_radio [role="radiogroup"] label:has(input:checked),
 .st-key-nav [role="radiogroup"] label:has(input:checked) {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(34, 211, 238, 0.3)) !important;
+  background: #27272a !important;
   color: #ffffff !important;
   font-weight: 600 !important;
-  border: 1px solid rgba(99, 102, 241, 0.7) !important;
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-  transform: translateY(0) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important;
 }
 
 .st-key-nav_wrapper [role="radiogroup"] label:has(input:checked) *,
@@ -318,23 +367,23 @@ div[data-testid="stSegmentedControl"] button[data-active="true"] {
   bottom: 5.85rem !important;
   left: 50% !important;
   transform: translate(-50%, 10px) scale(0.9) !important;
-  width: 42px !important;
-  height: 42px !important;
+  width: 36px !important;
+  height: 36px !important;
   border-radius: 50% !important;
-  background: rgba(18, 22, 34, 0.94) !important;
-  border: 1px solid rgba(99, 102, 241, 0.5) !important;
-  color: #38bdf8 !important;
+  background: #18181b !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #f4f4f5 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 15px rgba(99, 102, 241, 0.35) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
   cursor: pointer !important;
   z-index: 998 !important;
   opacity: 0 !important;
   visibility: hidden !important;
-  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease !important;
+  transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.12s ease !important;
   pointer-events: none !important;
 }
 
@@ -346,40 +395,78 @@ div[data-testid="stSegmentedControl"] button[data-active="true"] {
 }
 
 .fx-scroll-bottom-btn:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(34, 211, 238, 0.35)) !important;
+  background: #202024 !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
   color: #ffffff !important;
-  border-color: rgba(34, 211, 238, 0.8) !important;
-  transform: translate(-50%, -2px) scale(1.08) !important;
-  box-shadow: 0 8px 25px rgba(34, 211, 238, 0.45) !important;
+  transform: translate(-50%, -1px) scale(1.04) !important;
 }
 
 .fx-scroll-bottom-btn:active {
   transform: translate(-50%, 1px) scale(0.96) !important;
 }
 
-/* ---- Chat Messages ---- */
-[data-testid="stChatMessage"]{background:var(--panel);border:1px solid var(--line-soft);
-  border-radius:14px;padding:1rem 1.15rem;margin-bottom:.75rem;box-shadow:0 4px 12px rgba(0,0,0,0.25)}
+/* ---- Chat Messages (Claude / ChatGPT Typography) ---- */
+[data-testid="stChatMessage"]{
+  background: transparent !important;
+  border: none !important;
+  padding: 0.85rem 0 !important;
+  margin-bottom: 0.4rem !important;
+  box-shadow: none !important;
+}
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]){
-  background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.25)}
-[data-testid="stCode"] pre, pre{background:#0f1117 !important;border:1px solid var(--line);
-  border-radius:10px}
+  display: flex !important;
+  justify-content: flex-end !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) [data-testid="stMarkdownContainer"]{
+  background: #27272a !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 18px !important;
+  padding: 8px 16px !important;
+  color: #f4f4f5 !important;
+  max-width: 85% !important;
+}
+[data-testid="stCode"] pre, pre{
+  background: #121215 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px !important;
+}
 
-/* ---- Bottom Prompt Dock ---- */
-[data-testid="stBottom"]>div{background:linear-gradient(to top,var(--bg) 75%,transparent)}
-[data-testid="stChatInput"]{background:var(--panel);border:1px solid var(--line);
-  border-radius:16px;transition:border-color var(--ease),box-shadow var(--ease)}
-[data-testid="stChatInput"]:focus-within{border-color:var(--accent);
-  box-shadow:0 0 0 3px var(--accent-soft)}
+/* ---- Bottom Prompt Dock (Claude 3.5 & ChatGPT 4o Style) ---- */
+[data-testid="stBottom"]>div{background: linear-gradient(to top, var(--bg) 80%, transparent) !important;}
+[data-testid="stChatInput"]{
+  background: #18181b !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 20px !important;
+  padding: 4px 10px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  transition: border-color var(--ease) !important;
+}
+[data-testid="stChatInput"]:focus-within{
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: none !important;
+}
 .st-key-dock_toolbar{position:sticky;bottom:var(--dock-h);z-index:50;padding:.25rem 0}
 
-/* ---- Buttons ---- */
-button[data-testid^="stBaseButton"]{background:var(--panel);border:1px solid var(--line);
-  border-radius:10px;color:var(--text);
-  transition:border-color var(--ease),transform var(--ease),box-shadow var(--ease)}
-button[data-testid^="stBaseButton"]:hover{border-color:var(--accent);transform:translateY(-1px);
-  box-shadow:0 4px 14px rgba(99,102,241,.18)}
-button[data-testid="stBaseButton-primary"]{background:var(--accent);border-color:var(--accent);color:#fff}
+/* ---- Buttons (Minimalist Monochrome) ---- */
+button[data-testid^="stBaseButton"]{
+  background: #18181b !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  color: #f4f4f5 !important;
+  transition: all var(--ease) !important;
+  box-shadow: none !important;
+}
+button[data-testid^="stBaseButton"]:hover{
+  background: #202024 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  transform: translateY(-1px) !important;
+}
+button[data-testid="stBaseButton-primary"]{
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #09090b !important;
+  font-weight: 600 !important;
+}
 
 /* ---- Popovers & Selectbox Listbox (Readable & Un-Clipped) ---- */
 [data-testid="stPopoverBody"]{background:var(--panel-2);border:1px solid var(--line);
@@ -407,6 +494,7 @@ div[role="dialog"] button[aria-label="Close"]:hover{
   position:fixed !important;top:1.25rem !important;right:1.5rem !important;z-index:2147483647 !important;
   background:#ef4444 !important;color:#fff !important;border:2px solid #fff !important;border-radius:9999px !important;
   padding:.55rem 1.35rem !important;font-weight:700 !important;font-size:.95rem !important;
+}
 /* ---- Images: Keep Fullscreen Button Anchored on Top-Right of Image ---- */
 [data-testid="stImage"] {
   display: inline-flex !important;
@@ -431,6 +519,27 @@ div[role="dialog"] button[aria-label="Close"]:hover{
 [data-testid="stImage"]:hover .stImageHoverButton,
 [data-testid="stImage"]:hover [data-testid="StyledFullScreenButton"] {
   opacity: 1 !important;
+}
+
+/* Media layout stability (CLS = 0) */
+[data-testid="stImage"] img {
+  border-radius: 12px !important;
+  max-width: 100% !important;
+  object-fit: contain !important;
+  transform: translate3d(0, 0, 0);
+}
+[data-testid="stVideo"] video {
+  border-radius: 12px !important;
+  aspect-ratio: 16 / 9 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Instant tactile feedback on button clicks */
+button:active, [role="button"]:active {
+  transform: scale(0.96) !important;
+  transition: transform 0.05s ease-out !important;
 }
 
 [data-testid="stMainBlockContainer"],
@@ -467,7 +576,22 @@ def inject_css():
 # 2. JS: Shortcuts & Auto-Scroll
 # --------------------------------------------------------------------------- #
 def inject_js():
-    pass
+    fx_path = Path(__file__).parent / "src" / "studio_fx.js"
+    fx_code = ""
+    if fx_path.exists():
+        try:
+            fx_code = fx_path.read_text(encoding="utf-8")
+        except Exception:
+            fx_code = ""
+    components.html(f"""<script>
+      try {{
+        if (!window.parent.__studioFx) {{
+          {fx_code}
+        }} else if (window.parent.__studioFx.checkGreeting) {{
+          window.parent.__studioFx.checkGreeting();
+        }}
+      }} catch (e) {{}}
+    </script>""", height=0)
 
 def scroll_bottom():
     components.html(f"""<script>/*{time.time()}*/
@@ -556,6 +680,75 @@ def model_selector(models=MODELS, key="model") -> Dict[str, Any]:
         )
     return _model(models, ss[key])
 
+# ----------------- BULLETPROOF MERMAID & MARKDOWN SANITIZER -----------------
+def sanitize_mermaid_block(code: str) -> str:
+    """Sanitizes raw Mermaid syntax so that browser Mermaid.js renders cleanly without parse errors."""
+    code = code.strip()
+    if not code:
+        return 'flowchart TD\n    A["Empty Diagram"]'
+    lines = [l.rstrip() for l in code.splitlines()]
+    first = lines[0].strip() if lines else ""
+    valid_headers = ("flowchart", "graph", "sequenceDiagram", "classDiagram", "stateDiagram", "erDiagram", "gantt", "pie", "gitGraph", "journey", "mindmap")
+    if not any(first.startswith(h) for h in valid_headers):
+        lines.insert(0, "flowchart TD")
+    
+    subgraph_count = 0
+    end_count = 0
+    cleaned_lines = []
+    
+    for line in lines:
+        stripped = line.strip()
+        if re.match(r'^subgraph\b', stripped, re.IGNORECASE):
+            subgraph_count += 1
+            m_sub = re.match(r'^(subgraph\s+)(.*)$', stripped, re.IGNORECASE)
+            if m_sub:
+                t = m_sub.group(2).strip()
+                if t and not (t.startswith('"') and t.endswith('"')):
+                    clean_t = t.replace('"', '')
+                    line = f'{m_sub.group(1)}"{clean_t}"'
+        elif re.match(r'^end\b', stripped, re.IGNORECASE):
+            end_count += 1
+        
+        # Quote node labels with special characters
+        def quote_label(m):
+            nid = m.group(1)
+            text = m.group(2).strip()
+            if (text.startswith('"') and text.endswith('"')) or (text.startswith('("') and text.endswith('")')):
+                return f'{nid}[{text}]'
+            clean = text.replace('"', "'")
+            return f'{nid}["{clean}"]'
+        line = re.sub(r'(\b[A-Za-z0-9_]+)\[([^\[\]]+)\]', quote_label, line)
+        cleaned_lines.append(line)
+    
+    while subgraph_count > end_count:
+        cleaned_lines.append("    end")
+        end_count += 1
+    
+    return "\n".join(cleaned_lines)
+
+def safe_markdown(text: str) -> str:
+    """Ensures markdown with ```mermaid blocks is 100% syntactically valid and never crashes."""
+    if not text:
+        return ""
+    
+    # Auto-close unclosed code block if response was truncated
+    if text.count("```") % 2 != 0:
+        if "```mermaid" in text:
+            last_idx = text.rfind("```mermaid")
+            after = text[last_idx + len("```mermaid"):]
+            sub_c = len(re.findall(r'\bsubgraph\b', after, re.I))
+            end_c = len(re.findall(r'\bend\b', after, re.I))
+            if sub_c > end_c:
+                text += "\n" + "\n".join(["    end"] * (sub_c - end_c))
+        text += "\n```\n"
+    
+    def _repl(m):
+        code = m.group(1)
+        cleaned = sanitize_mermaid_block(code)
+        return f"```mermaid\n{cleaned}\n```"
+    
+    return re.sub(r'```mermaid\s*([\s\S]*?)```', _repl, text)
+
 # --------------------------------------------------------------------------- #
 # 5. Chat Sessions Checklist & History
 # --------------------------------------------------------------------------- #
@@ -578,9 +771,13 @@ def _init():
             for s in get_all_sessions():
                 loaded = load_session(s["id"])
                 if loaded:
+                    msgs = loaded.get("messages", [])
+                    for m in msgs:
+                        if m.get("content"):
+                            m["content"] = safe_markdown(m["content"])
                     ss.sessions[s["id"]] = {
                         "title": loaded.get("title", s.get("title", "Chat")),
-                        "messages": loaded.get("messages", []),
+                        "messages": msgs,
                         "ts": loaded.get("updated_at", s.get("updated_at", time.time()))
                     }
         except Exception:
@@ -642,6 +839,7 @@ def render_sidebar():
 # --------------------------------------------------------------------------- #
 # 6. Chat Rendering with Streaming, Files & Dock
 # --------------------------------------------------------------------------- #
+
 _TEXT_EXT = (
     ".py", ".js", ".ts", ".tsx", ".json", ".md", ".markdown", ".txt", ".notes", ".note",
     ".csv", ".tsv", ".html", ".css", ".yml", ".yaml", ".ipynb", ".java", ".c", ".cpp",
@@ -650,7 +848,15 @@ _TEXT_EXT = (
 )
 
 def _badges(meta: Dict[str, Any]):
-    parts = [f'⏱ {meta["secs"]:.1f}s', f'≈ {meta["tokens"]} tok', f'{meta["provider"]} · {meta["model"]}']
+    secs = max(0.01, float(meta.get("secs", 0.1)))
+    toks = max(1, int(meta.get("tokens", 1)))
+    tps = int(toks / secs)
+    speed_tag = f" · {tps} tok/s" if tps > 0 else ""
+    parts = [
+        f'⚡ {secs:.2f}s',
+        f'≈ {toks} tok{speed_tag}',
+        f'☁️ {meta["provider"]} · {meta["model"]}'
+    ]
     st.markdown("".join(f'<span class="badge">{p}</span>' for p in parts), unsafe_allow_html=True)
 
 def _read_input(raw):
@@ -691,26 +897,55 @@ def render_chat(generate: Callable):
             if m.get("media"):
                 for idx, med in enumerate(m["media"]):
                     media_card(med.get("kind", "image"), med.get("data"), key=f"chat_med_hist_{m_idx}_{idx}")
-            st.markdown(m["content"])
+            st.markdown(safe_markdown(m["content"]))
             if m["role"] == "assistant" and m.get("meta"):
                 _badges(m["meta"])
 
     queued = None
     if not sess["messages"]:
-        st.markdown('<div class="empty"><b>AI Studio Ready</b>Ask anything, attach code or '
-                    'files in the box below, or pick a starter prompt.</div>', unsafe_allow_html=True)
-        cols = st.columns(len(STARTERS))
-        for col, (label, text) in zip(cols, STARTERS.items()):
-            if col.button(label, key=f"st_{label}", use_container_width=True):
-                queued = text
+        components.html("""<script>
+          try {
+            const m = window.parent.document.querySelector('[data-testid="stMain"]');
+            if (m && m.scrollTop > 0) m.scrollTop = 0;
+          } catch (e) {}
+        </script>""", height=0)
+        st.markdown("""
+        <div class="chat-empty-greeting">
+          <h2>What can I help you ship?</h2>
+          <p>Ultra-fast multi-model cloud reasoning, multimodal document auditing, and creative media synthesis — 100% cloud powered with zero local GPU load.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Sticky toolbar directly above prompt dock
-    with st.container(key="dock_toolbar"):
-        c1, _ = st.columns([3.5, 6.5], vertical_alignment="center")
+        st_keys = list(STARTERS.keys())
+        c1, c2 = st.columns(2)
         with c1:
-            model = model_selector()
+            if st.button(f"{st_keys[0]}  →", key=f"st_{st_keys[0]}", use_container_width=True):
+                queued = STARTERS[st_keys[0]]
+            if st.button(f"{st_keys[2]}  →", key=f"st_{st_keys[2]}", use_container_width=True):
+                queued = STARTERS[st_keys[2]]
+        with c2:
+            if st.button(f"{st_keys[1]}  →", key=f"st_{st_keys[1]}", use_container_width=True):
+                queued = STARTERS[st_keys[1]]
+            if st.button(f"{st_keys[3]}  →", key=f"st_{st_keys[3]}", use_container_width=True):
+                queued = STARTERS[st_keys[3]]
 
-    text, files = _read_input(_chat_input())
+    # Floating prompt dock with sticky model selector
+    if hasattr(st, "bottom"):
+        b_ctx = st.bottom() if callable(st.bottom) else st.bottom
+        with b_ctx:
+            with st.container(key="dock_toolbar"):
+                c1, _ = st.columns([3.5, 6.5], vertical_alignment="center")
+                with c1:
+                    model = model_selector()
+            _raw_inp = _chat_input()
+    else:
+        with st.container(key="dock_toolbar"):
+            c1, _ = st.columns([3.5, 6.5], vertical_alignment="center")
+            with c1:
+                model = model_selector()
+        _raw_inp = _chat_input()
+
+    text, files = _read_input(_raw_inp)
     text = queued or text
     if not text:
         if ss.pop("_scroll", False):
@@ -789,7 +1024,7 @@ def render_chat(generate: Callable):
                     st.image(img_b, width=320)
                 except Exception:
                     pass
-        st.markdown(full)
+        st.markdown(safe_markdown(full))
 
     msgs = [{"role": m["role"], "content": m["content"]} for m in sess["messages"]]
     with st.chat_message("assistant"):
@@ -797,7 +1032,7 @@ def render_chat(generate: Callable):
         try:
             out = generate(model, msgs, attachments)
             if isinstance(out, str):
-                st.markdown(out)
+                st.markdown(safe_markdown(out))
                 reply = out
             else:
                 reply = st.write_stream(out)
@@ -816,7 +1051,7 @@ def render_chat(generate: Callable):
                 "provider": model["provider"], "model": model["name"]}
         _badges(meta)
 
-    msg_record = {"role": "assistant", "content": reply, "meta": meta}
+    msg_record = {"role": "assistant", "content": safe_markdown(reply), "meta": meta}
     if gen_media:
         msg_record["media"] = gen_media
     sess["messages"].append(msg_record)
@@ -864,9 +1099,9 @@ def media_card(kind: str, src, key: str):
         m_c1, m_c2 = st.columns([7.5, 2.5], vertical_alignment="center")
         icon = "🎵" if kind == "audio" else ("🎬" if kind == "video" else "🖼️")
         m_c1.caption(f"{icon} {kind.capitalize()} minimized")
-        if m_c2.button(f"➕ Expand {kind.capitalize()}", key=f"unmin_{key}", use_container_width=True):
+        def _unmin():
             st.session_state[f"min_{key}"] = False
-            st.rerun()
+        m_c2.button(f"➕ Expand {kind.capitalize()}", key=f"unmin_{key}", on_click=_unmin, use_container_width=True)
         return
 
     if kind == "image":
@@ -881,9 +1116,9 @@ def media_card(kind: str, src, key: str):
         if st.button("⛶ Fullscreen", key=f"exp_{key}", use_container_width=True):
             _preview(kind, src)
     with c2:
-        if st.button("➖ Minimize", key=f"min_btn_{key}", use_container_width=True):
+        def _min():
             st.session_state[f"min_{key}"] = True
-            st.rerun()
+        st.button("➖ Minimize", key=f"min_btn_{key}", on_click=_min, use_container_width=True)
     with c3:
         if isinstance(src, bytes):
             ext = "png" if kind == "image" else ("mp4" if kind == "video" else "wav")

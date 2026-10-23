@@ -1,1221 +1,704 @@
 /* =====================================================================
-   studio_theme.css - GetLayers-Grade "Aurora Layer" for Hackathon AI Studio
-   Direction: Deep luxury dark canvas, cursor-driven aurora whose color pair
-   changes per tab. Color encodes state (provider ready/missing, active tab).
-   Tokens: ink #07080d | panel #0e1018 | indigo #6366f1 | violet #a855f7
-           fuchsia #ec4899 | cyan #22d3ee | amber #fbbf24 | mint #34d399
-   Type:   Space Grotesk (display) + Inter (body) + JetBrains Mono (numbers/code)
+   studio_theme.css - Production-Grade AI Interface (Claude · Vercel · ChatGPT)
+   Aesthetic: Obsidian & Zinc Minimalist Architecture.
+   Strictly ZERO tacky neon glows, zero rainbow gradients, zero gaudy badges.
+   Pure focus, high typography contrast, optimal reading ergonomics.
    ===================================================================== */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
-
-/* animatable custom properties */
-@property --a1 { syntax: '<color>'; inherits: true; initial-value: #6366f1; }
-@property --a2 { syntax: '<color>'; inherits: true; initial-value: #22d3ee; }
-@property --ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --ink: #07080d;
-  --panel: #0e1018;
-  --panel-elev: #141722;
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.18);
-  --c-indigo: #6366f1;
-  --c-violet: #a855f7;
-  --c-fuchsia: #ec4899;
-  --c-cyan: #22d3ee;
-  --c-amber: #fbbf24;
-  --c-mint: #34d399;
-  --a1: #6366f1;
-  --a2: #22d3ee;
-  --mx: 50vw;
-  --my: 30vh;
-  --display: 'Space Grotesk', 'Inter', -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  transition: --a1 0.7s ease, --a2 0.7s ease;
+  --bg: #09090b;             /* Pure Obsidian Zinc-950 */
+  --bg-sidebar: #0f0f12;     /* Subtle muted sidebar */
+  --panel: #141417;          /* Elevated surface */
+  --panel-card: #18181b;     /* Card background (Zinc-900) */
+  --panel-hover: #202024;    /* Subtle hover state */
+  --border: rgba(255, 255, 255, 0.08); /* Clean 1px hairline border */
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-focus: rgba(255, 255, 255, 0.28);
+  
+  --text-primary: #f4f4f5;   /* High-contrast warm off-white */
+  --text-secondary: #a1a1aa; /* Zinc-400 */
+  --text-muted: #71717a;     /* Zinc-500 */
+  
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #09090b;
+  --btn-secondary-bg: #18181b;
+  --btn-secondary-border: rgba(255, 255, 255, 0.1);
+  --btn-secondary-text: #ededed;
+  
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+  
+  --ease-snappy: 120ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Tab-dependent atmospheric color shifts (GetLayers adaptive lighting) */
-html[data-tab="0"] { --a1: #6366f1; --a2: #22d3ee; }   /* Tab 1 (Chat): Electric Indigo -> Telemetry Cyan */
-html[data-tab="1"] { --a1: #a855f7; --a2: #ec4899; }   /* Tab 2 (Auditor): Deep Violet -> Neon Fuchsia */
-html[data-tab="2"] { --a1: #ec4899; --a2: #fbbf24; }   /* Tab 3 (Media): Neon Fuchsia -> Warm Amber */
-html[data-tab="3"] { --a1: #34d399; --a2: #22d3ee; }   /* Tab 4 (Deploy): Emerald Mint -> Cyan */
+/* ---------- Global Reset & Smooth Native Scrolling ---------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
-/* ---------- Aurora Mesh & Cursor Spotlight ---------- */
+html, body, [data-testid="stMain"] {
+  background-color: var(--bg) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-sans) !important;
+  letter-spacing: -0.01em;
+  scroll-behavior: smooth !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+/* ---------- Clean App Canvas (Zero Neon Meshes) ---------- */
 .stApp {
-  background: var(--ink) !important;
+  background: var(--bg) !important;
 }
 
-.stApp::before {
-  content: "";
-  position: fixed;
-  inset: -25%;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(38% 34% at 22% 28%, color-mix(in srgb, var(--a1) 32%, transparent), transparent 70%),
-    radial-gradient(34% 30% at 78% 22%, color-mix(in srgb, var(--a2) 24%, transparent), transparent 70%),
-    radial-gradient(40% 36% at 60% 82%, color-mix(in srgb, var(--c-violet) 16%, transparent), transparent 70%);
-  animation: aurora 24s ease-in-out infinite alternate;
-  will-change: transform;
+.stApp::before, .stApp::after {
+  display: none !important;
 }
 
-@keyframes aurora {
-  0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
-  50% { transform: translate3d(3%, -2%, 0) rotate(5deg) scale(1.08); }
-  100% { transform: translate3d(-3%, 2%, 0) rotate(-4deg) scale(1.02); }
+/* Center conversational workspace to optimal 768px reading width */
+.block-container,
+[data-testid="stMainBlockContainer"] {
+  max-width: 820px !important;
+  margin: 0 auto !important;
+  padding-top: 4.5rem !important;
+  padding-bottom: 7rem !important;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
 }
 
-/* Cursor-following atmospheric spotlight */
-.stApp::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: radial-gradient(560px circle at var(--mx) var(--my), color-mix(in srgb, var(--a1) 16%, transparent), transparent 65%);
+/* Expand container on Auditor and Studio tabs */
+html[data-tab="1"] .block-container,
+html[data-tab="2"] .block-container,
+html[data-tab="3"] .block-container {
+  max-width: 1140px !important;
 }
 
-[data-testid="stMain"],
-[data-testid="stAppViewContainer"] > section:not([data-testid="stSidebar"]) {
-  position: relative;
-  z-index: 1;
-}
-
-/* ---------- Streamlit Header: Clean subtle backdrop across all scroll positions ---------- */
+/* ---------- Streamlit Top Header (Translucent Glass) ---------- */
 header[data-testid="stHeader"],
 [data-testid="stHeader"] {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 3.75rem !important;
-  z-index: 100000 !important;
-  background: rgba(10, 12, 20, 0.45) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-}
-
-.stTabs [data-baseweb="tab"],
-[data-testid="stTab"] {
-  border-radius: 10px !important;
-  height: 40px !important;
-  padding: 0 16px !important;
-  color: var(--muted) !important;
-  font-weight: 500 !important;
-  transition: all 0.2s ease !important;
-  cursor: pointer !important;
-}
-
-.stTabs [data-baseweb="tab"]:hover,
-[data-testid="stTab"]:hover {
-  color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-}
-
-.stTabs [aria-selected="true"],
-[data-testid="stTab"][aria-selected="true"] {
-  color: #ffffff !important;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--a1) 32%, transparent), color-mix(in srgb, var(--a2) 18%, transparent)) !important;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--a1) 50%, transparent), 0 8px 24px -8px var(--a1) !important;
-}
-
-/* ---------- Top-Right Deploy & Developer Toolbar Styling ---------- */
-[data-testid="stToolbar"] {
-  background: transparent !important;
-  right: 1.5rem !important;
-  top: 0.8rem !important;
-}
-
-[data-testid="stToolbar"] button,
-button[data-testid="stBaseButton-header"],
-[data-testid="stToolbarActions"] button {
-  background: rgba(14, 16, 24, 0.85) !important;
+  height: 3.5rem !important;
+  z-index: 10000 !important;
+  background: rgba(9, 9, 11, 0.8) !important;
   backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  border-radius: 10px !important;
-  color: #f1f5f9 !important;
-  font-weight: 600 !important;
-  transition: all 0.2s ease !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+/* Clean Header Action Buttons */
+[data-testid="stToolbar"] button,
+button[data-testid="stBaseButton-header"] {
+  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-secondary) !important;
+  transition: all var(--ease-snappy) !important;
 }
 
 [data-testid="stToolbar"] button:hover,
 button[data-testid="stBaseButton-header"]:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.2)) !important;
-  border-color: var(--c-cyan) !important;
-  box-shadow: 0 0 20px -4px var(--a1) !important;
-  transform: translateY(-1px);
+  background: var(--panel-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-strong) !important;
 }
 
-/* ---------- Sidebar Refinements & Logo ---------- */
-section[data-testid="stSidebar"] {
-  z-index: 2;
-  background: color-mix(in srgb, var(--panel) 90%, transparent) !important;
-  backdrop-filter: blur(18px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
-  border-right: 1px solid var(--border-subtle) !important;
+/* ---------- Left Sidebar (ChatGPT / Claude Style) ---------- */
+section[data-testid="stSidebar"],
+[data-testid="stSidebar"] {
+  background: var(--bg-sidebar) !important;
+  border-right: 1px solid var(--border) !important;
+  z-index: 1000005 !important;
 }
 
-.brand {
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stExpandSidebarButton"] {
+  z-index: 1000010 !important;
+  pointer-events: auto !important;
+}
+
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stExpandSidebarButton"] button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+  gap: 0.6rem !important;
+}
+
+/* Clean Sidebar Workspace / Brand */
+.saas-workspace-card {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  margin: 0.2rem 0 1.2rem;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 0.5rem;
 }
 
-.brand-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  flex: none;
-  background: linear-gradient(145deg, #161a29, #0e111a);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 8px 24px -8px rgba(99, 102, 241, 0.6);
-}
-
-.brand-name {
-  font-family: var(--display);
+.saas-workspace-card .saas-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #27272a;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
   font-weight: 700;
-  font-size: 1.05rem;
+}
+
+/* Clean "New Chat" Pill Button */
+button[key="sidebar_new_chat"],
+button[id*="new_chat"] {
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
+  font-size: 0.88rem !important;
+  padding: 0.6rem 1rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  transition: all var(--ease-snappy) !important;
+  box-shadow: none !important;
+}
+
+button[key="sidebar_new_chat"]:hover,
+button[id*="new_chat"]:hover {
+  background: var(--panel-hover) !important;
+  border-color: var(--border-strong) !important;
+}
+
+button[key="sidebar_new_chat"]:active,
+button[id*="new_chat"]:active {
+  transform: scale(0.98) !important;
+}
+
+/* Clean Sidebar Telemetry Widget */
+.saas-quota-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.saas-quota-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.saas-quota-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding: 3px 0;
+}
+
+.saas-quota-row b {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ---------- Vercel / Linear Minimalist Top Tab Navigation ---------- */
+.st-key-nav_wrapper,
+.st-key-hub_nav_segmented,
+.st-key-hub_nav_radio {
+  position: sticky !important;
+  top: 3.5rem !important;
+  z-index: 999 !important;
+  width: 100% !important;
+  background: rgba(9, 9, 11, 0.85) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 0.35rem 0 !important;
+  margin: 0 0 1.25rem 0 !important;
+}
+
+div[data-testid="stSegmentedControl"],
+.st-key-hub_nav_segmented div[data-testid="stSegmentedControl"],
+[data-testid="stButtonGroup"] [role="radiogroup"],
+.st-key-nav_wrapper [role="radiogroup"],
+.st-key-hub_nav_segmented [role="radiogroup"],
+.st-key-hub_nav_radio [role="radiogroup"] {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.25rem !important;
+  background: rgba(18, 18, 21, 0.75) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  padding: 3px !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Tab Item Style */
+button[data-variant="segmented_control"],
+[role="radiogroup"] button[role="radio"],
+div[data-testid="stSegmentedControl"] button,
+.st-key-nav_wrapper [role="radiogroup"] label,
+.st-key-hub_nav_radio [role="radiogroup"] label {
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 0.45rem 1rem !important;
+  font-size: 0.86rem !important;
+  font-weight: 500 !important;
+  color: var(--text-secondary) !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  transition: all var(--ease-snappy) !important;
+  white-space: nowrap !important;
+  user-select: none !important;
+  box-shadow: none !important;
+}
+
+button[data-variant="segmented_control"]:hover,
+[role="radiogroup"] button[role="radio"]:hover,
+div[data-testid="stSegmentedControl"] button:hover,
+.st-key-nav_wrapper [role="radiogroup"] label:hover,
+.st-key-hub_nav_radio [role="radiogroup"] label:hover {
+  color: var(--text-primary) !important;
+  background: var(--panel-hover) !important;
+  border-color: transparent !important;
+}
+
+/* Active Tab: Pure Clean Minimalist Highlight (Claude / Vercel) */
+button[data-variant="segmented_control"][aria-checked="true"],
+button[data-variant="segmented_control"][data-selected="true"],
+[role="radiogroup"] button[role="radio"][aria-checked="true"],
+[role="radiogroup"] button[role="radio"][data-selected="true"],
+div[data-testid="stSegmentedControl"] button[aria-checked="true"],
+div[data-testid="stSegmentedControl"] button[aria-selected="true"],
+div[data-testid="stSegmentedControl"] button[data-active="true"],
+.st-key-nav_wrapper [role="radiogroup"] label:has(input:checked),
+.st-key-hub_nav_radio [role="radiogroup"] label:has(input:checked) {
+  background: #27272a !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Hide Radio Circles */
+.st-key-nav_wrapper [role="radiogroup"] input[type="radio"],
+.st-key-nav_wrapper [role="radiogroup"] label > div:first-child,
+.st-key-hub_nav_radio [role="radiogroup"] input[type="radio"],
+.st-key-hub_nav_radio [role="radiogroup"] label > div:first-child {
+  display: none !important;
+}
+
+/* ---------- Clean Topbar Telemetry Strip ---------- */
+.saas-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.5rem 0 0.85rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.saas-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saas-brand-name {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.015em;
+}
+
+.saas-badge-pill {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  background: #27272a;
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+}
+
+.saas-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.saas-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.saas-status-chip b {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.saas-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+/* ---------- Empty Chat Canvas (Claude / ChatGPT Aesthetic) ---------- */
+.chat-empty-greeting {
+  text-align: center;
+  margin-top: 1.5rem !important;
+  padding: 0.5rem 1rem 1.25rem !important;
+}
+
+.chat-empty-greeting h2 {
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  margin-bottom: 0.4rem;
+}
+
+.chat-empty-greeting p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* Clean 2x2 Starter Cards */
+div[class*="st-key-st_"] button,
+button[id*="st_✦"], button[id*="st_⬡"], button[id*="st_◈"], button[id*="st_⚡"] {
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 0.85rem 1.1rem !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  color: var(--text-primary) !important;
+  text-align: left !important;
+  justify-content: space-between !important;
+  display: flex !important;
+  align-items: center !important;
+  transition: all var(--ease-snappy) !important;
+  box-shadow: none !important;
+  margin-bottom: 0.5rem !important;
+}
+
+div[class*="st-key-st_"] button:hover,
+button[id*="st_✦"]:hover, button[id*="st_⬡"]:hover, button[id*="st_◈"]:hover, button[id*="st_⚡"]:hover {
+  background: var(--panel-hover) !important;
+  border-color: var(--border-strong) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
+}
+
+div[class*="st-key-st_"] button:active,
+button[id*="st_✦"]:active, button[id*="st_⬡"]:active, button[id*="st_◈"]:active, button[id*="st_⚡"]:active {
+  transform: scale(0.98) !important;
+}
+
+/* ---------- Chat Messages (Claude / ChatGPT Typography) ---------- */
+[data-testid="stChatMessage"] {
+  background: transparent !important;
+  border: none !important;
+  padding: 1rem 0 !important;
+  margin: 0 !important;
+}
+
+/* User Message Bubble */
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+  display: flex !important;
+  justify-content: flex-end !important;
+}
+
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) [data-testid="stMarkdownContainer"] {
+  background: #27272a !important;
+  border-radius: 18px !important;
+  padding: 10px 16px !important;
+  color: #ffffff !important;
+  display: inline-block !important;
+  max-width: 85% !important;
+}
+
+/* Assistant Message: Clean Markdown Flow */
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) [data-testid="stMarkdownContainer"] {
+  color: var(--text-primary) !important;
+  font-size: 0.95rem !important;
+  line-height: 1.65 !important;
+}
+
+/* Clean Markdown Code Blocks */
+pre, code {
+  font-family: var(--font-mono) !important;
+  font-size: 0.86rem !important;
+}
+
+pre {
+  background: #121215 !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 1rem !important;
+  overflow-x: auto !important;
+}
+
+code:not(pre code) {
+  background: #1e1e24 !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  color: #ededed !important;
+}
+
+/* ---------- Floating Prompt Dock (Claude 3.5 & ChatGPT 4o Style) ---------- */
+.st-key-dock_toolbar,
+.st-key-chat_dock {
+  max-width: 820px !important;
+  margin: 0 auto 6px auto !important;
+  position: relative !important;
+  bottom: auto !important;
+  z-index: 100 !important;
+}
+
+[data-testid="stBottom"],
+div[data-testid="stBottom"] > div {
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+/* Subtle Modern Zinc Alert Cards (Zero Garish Red Banners) */
+[data-testid="stAlert"],
+.stAlert {
+  background: var(--panel) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* Prompt Textarea Enclosure */
+[data-testid="stChatInput"] {
+  background: var(--panel-card) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4) !important;
+  padding: 6px 12px !important;
+  transition: border-color var(--ease-snappy) !important;
+}
+
+[data-testid="stChatInput"]:focus-within {
+  border-color: var(--border-focus) !important;
+}
+
+[data-testid="stChatInput"] textarea {
+  color: var(--text-primary) !important;
+  font-size: 0.94rem !important;
+  background: transparent !important;
+}
+
+[data-testid="stChatInput"] textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* Minimalist Circular Send Button (ChatGPT/Claude Style) */
+[data-testid="stChatInput"] button {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all var(--ease-snappy) !important;
+  border: none !important;
+}
+
+[data-testid="stChatInput"] button:disabled {
+  background: #27272a !important;
+  color: #71717a !important;
+  opacity: 0.6 !important;
+}
+
+[data-testid="stChatInput"] button:not(:disabled):hover {
+  background: #e4e4e7 !important;
+  transform: scale(1.05) !important;
+}
+
+[data-testid="stChatInput"] button:not(:disabled):active {
+  transform: scale(0.95) !important;
+}
+
+/* ---------- Minimalist Model Picker Pill ---------- */
+.model-pill-trigger,
+button[id*="model_select"],
+button[id*="Qwen"], button[id*="Gemini"], button[id*="Groq"] {
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-secondary) !important;
+  font-size: 0.8rem !important;
+  font-weight: 500 !important;
+  padding: 0.35rem 0.75rem !important;
+  box-shadow: none !important;
+}
+
+.model-pill-trigger:hover,
+button[id*="model_select"]:hover,
+button[id*="Qwen"]:hover, button[id*="Gemini"]:hover, button[id*="Groq"]:hover {
+  background: var(--panel-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+/* ---------- Clean Cards & Sections for Tabs 2, 3, 4 ---------- */
+.tab-head {
+  padding: 0.5rem 0 1rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+
+.tab-title {
+  font-size: 1.35rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
   color: #ffffff;
 }
 
-.brand-sub {
-  font-size: 0.74rem;
-  color: var(--muted);
-  font-weight: 500;
-}
-
-/* Sidebar button spacing so labels never truncate */
-section[data-testid="stSidebar"] .stButton > button {
-  padding: 0 0.5rem !important;
-  font-size: 0.82rem !important;
-  white-space: nowrap !important;
-}
-
-/* Remove blinking vertical line/caret ONLY on dropdown select boxes */
-div[data-baseweb="select"] input,
-[data-testid="stSelectbox"] input,
-.stSelectbox input {
-  caret-color: transparent !important;
-  cursor: pointer !important;
-  user-select: none !important;
-}
-
-/* Explicitly guarantee text inputs and textareas allow typing, caret, selection, and clipboard paste */
-[data-testid="stTextInput"] input,
-[data-testid="stTextArea"] textarea,
-.stTextInput input,
-.stTextArea textarea {
-  caret-color: #22d3ee !important;
-  cursor: text !important;
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  pointer-events: auto !important;
-}
-
-div[data-baseweb="select"],
-[data-testid="stSelectbox"],
-.stSelectbox {
-  cursor: pointer !important;
-}
-
-/* Fix option truncation: Give popovers full comfortable width and wrap text so long model descriptions are crystal clear */
-.react-aria-Popover,
-[data-baseweb="popover"],
-[data-baseweb="menu"],
-ul[role="listbox"],
-#stFloatingOverlayPortal [role="listbox"],
-[data-testid="stSelectbox"] [role="listbox"] {
-  min-width: 480px !important;
-  max-width: 95vw !important;
-  width: max-content !important;
-  background: #0e111a !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.92) !important;
-  z-index: 999999 !important;
-}
-
-.react-aria-ListBoxItem,
-[role="option"],
-li[role="option"] {
-  white-space: normal !important;
-  line-height: 1.45 !important;
-  padding: 10px 14px !important;
-  word-break: normal !important;
-  border-radius: 8px !important;
-  margin: 2px 4px !important;
-  font-size: 0.9rem !important;
-}
-
-/* ---------- Interactive Task Checklists in Chat Messages ---------- */
-li.task-list-item,
-ul.contains-task-list li {
-  list-style-type: none !important;
-  margin: 0.5rem 0 !important;
-  display: flex !important;
-  align-items: flex-start !important;
-  gap: 0.75rem !important;
-  transition: all 0.25s ease !important;
-  font-size: 0.92rem !important;
-  line-height: 1.5 !important;
-}
-
-li.task-list-item input[type="checkbox"],
-ul.contains-task-list li input[type="checkbox"] {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  width: 19px !important;
-  height: 19px !important;
-  margin-top: 3px !important;
-  border-radius: 6px !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.35) !important;
-  background: rgba(15, 18, 28, 0.9) !important;
-  cursor: pointer !important;
-  pointer-events: auto !important;
-  flex-shrink: 0 !important;
-  display: grid !important;
-  place-content: center !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-
-li.task-list-item input[type="checkbox"]:hover,
-ul.contains-task-list li input[type="checkbox"]:hover {
-  border-color: #22d3ee !important;
-  box-shadow: 0 0 10px rgba(34, 211, 238, 0.45) !important;
-  transform: scale(1.05) !important;
-}
-
-li.task-list-item input[type="checkbox"]:checked,
-ul.contains-task-list li input[type="checkbox"]:checked {
-  background: linear-gradient(135deg, #10b981, #06b6d4) !important;
-  border-color: #10b981 !important;
-  box-shadow: 0 0 14px rgba(16, 185, 129, 0.55) !important;
-}
-
-li.task-list-item input[type="checkbox"]:checked::before,
-ul.contains-task-list li input[type="checkbox"]:checked::before {
-  content: "✓" !important;
-  color: #ffffff !important;
-  font-size: 13px !important;
-  font-weight: 900 !important;
-  line-height: 1 !important;
-  display: block !important;
-}
-
-li.task-list-item.task-completed,
-ul.contains-task-list li.task-completed {
-  color: #94a3b8 !important;
-  text-decoration: line-through !important;
-  opacity: 0.72 !important;
-}
-
-/* ---------- Custom Interactive Cursor (Smooth & Reliable) ---------- */
-.fx-progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 2.5px;
-  width: 100%;
-  transform-origin: 0 50%;
-  transform: scaleX(0);
-  background: linear-gradient(90deg, var(--a1), var(--a2));
-  z-index: 2147483647;
-  pointer-events: none;
-  box-shadow: 0 0 14px var(--a1);
-}
-
-
-
-/* ---------- Command Palette (Ctrl+K / Cmd+K) ---------- */
-/* Command Palette removed per user request */
-
-/* ---------- Spotlight Border-Beam Cards (GetLayers Style) ---------- */
-.fx-card {
-  position: relative;
-  isolation: isolate;
-  background: rgba(14, 16, 24, 0.72) !important;
-  border: 1px solid var(--border-subtle) !important;
-  border-radius: 16px !important;
-}
-
-.fx-card::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  pointer-events: none;
-  z-index: 2;
-  background: radial-gradient(260px circle at var(--cx, 50%) var(--cy, 50%), var(--a1), var(--a2) 40%, transparent 75%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.fx-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 0;
-  background: radial-gradient(380px circle at var(--cx, 50%) var(--cy, 50%), color-mix(in srgb, var(--a1) 12%, transparent), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.fx-card:hover::before,
-.fx-card:hover::after {
-  opacity: 1;
-}
-
-/* ---------- GetLayers Hero (Rotating Conic Beam & Orbit) ---------- */
-.hx-wrap {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
-  gap: 2rem;
-  align-items: center;
-  padding: 2.2rem 2.6rem;
-  margin: 0 0 1.5rem;
-  border-radius: 24px;
-  overflow: hidden;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--panel) 90%, transparent), color-mix(in srgb, var(--ink) 75%, transparent));
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.85);
-}
-
-.hx-wrap::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  pointer-events: none;
-  background: conic-gradient(from var(--ang), transparent 0 62%, var(--a1), var(--a2), transparent 100%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: spin 9s linear infinite;
-}
-
-@keyframes spin {
-  to { --ang: 360deg; }
-}
-
-.hx-slot {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  opacity: 0.95;
-}
-
-.hx-slot canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.hx-copy, .hx-orbit {
-  position: relative;
-  z-index: 1;
-}
-
-.hx-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.32rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #cbd5e1;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
-
-.hx-title {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: clamp(1.8rem, 3.4vw, 2.9rem);
-  line-height: 1.12;
-  letter-spacing: -0.035em;
-  margin: 0.9rem 0 0.7rem;
-  background: linear-gradient(100deg, #ffffff 0%, #e0e7ff 26%, var(--a2) 64%, var(--a1) 100%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: sheen 8s ease-in-out infinite alternate;
-}
-
-@keyframes sheen {
-  to { background-position: 100% 0; }
-}
-
-.hx-sub {
-  color: #94a3b8;
-  font-size: 1.02rem;
-  max-width: 52ch;
-  margin: 0 0 1.1rem;
-  line-height: 1.5;
-}
-
-.hx-ticker {
-  height: 1.8rem;
-  overflow: hidden;
-  font: 600 0.95rem var(--mono);
-  color: var(--a2);
-  margin-bottom: 1.1rem;
-}
-
-.hx-ticker span {
-  display: block;
-  height: 1.8rem;
-}
-
-.hx-ticker div {
-  animation: tickroll 10s var(--ease) infinite;
-}
-
-@keyframes tickroll {
-  0%, 22% { transform: translateY(0); }
-  25%, 47% { transform: translateY(-1.8rem); }
-  50%, 72% { transform: translateY(-3.6rem); }
-  75%, 97% { transform: translateY(-5.4rem); }
-  100% { transform: translateY(0); }
-}
-
-.hx-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-}
-
-/* Celestial Orbital Rings */
-.hx-orbit {
-  aspect-ratio: 1;
-  width: min(100%, 290px);
-  justify-self: center;
-  position: relative;
-}
-
-.hx-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1px dashed rgba(255, 255, 255, 0.16);
-  animation: orbit 24s linear infinite;
-}
-
-.hx-ring.r2 {
-  inset: 16%;
-  animation-duration: 17s;
-  animation-direction: reverse;
-}
-
-.hx-ring.r3 {
-  inset: 32%;
-  animation-duration: 11s;
-}
-
-@keyframes orbit {
-  to { transform: rotate(360deg); }
-}
-
-.hx-node {
-  position: absolute;
-  top: -9px;
-  left: calc(50% - 9px);
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  box-shadow: 0 0 18px 2px currentColor;
-  background: currentColor;
-}
-
-.hx-node.g { color: var(--c-cyan) !important; }
-.hx-node.q { color: var(--c-indigo) !important; }
-.hx-node.f { color: var(--c-fuchsia) !important; }
-.hx-node.r { color: var(--c-mint) !important; }
-.hx-node.o { color: #818cf8 !important; }
-.hx-node.off { color: var(--c-amber) !important; opacity: 0.55; box-shadow: none !important; }
-
-.hx-core {
-  position: absolute;
-  inset: 38%;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: conic-gradient(from var(--ang), var(--a1), var(--a2), var(--c-violet), var(--a1));
-  animation: spin 6s linear infinite;
-  box-shadow: 0 0 50px -6px var(--a1);
-}
-
-.hx-core b {
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: var(--ink);
-  display: grid;
-  place-items: center;
-}
-
-@media (max-width: 900px) {
-  .hx-wrap { grid-template-columns: 1fr; padding: 1.5rem; }
-  .hx-orbit { display: none; }
-}
-
-/* ---------- Magnetic Buttons with Light Sheen ---------- */
-.stButton > button,
-.stDownloadButton > button {
-  transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0);
-}
-
-.stButton > button:hover,
-.stDownloadButton > button:hover {
-  transform: translate3d(var(--tx, 0px), calc(var(--ty, 0px) - 1px), 0);
-}
-
-.stButton > button[kind="primary"],
-.stButton > button[data-testid="stBaseButton-primary"] {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, var(--a1), color-mix(in srgb, var(--a1) 55%, var(--a2))) !important;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.28) inset, 0 12px 30px -10px var(--a1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
-}
-
-.stButton > button[data-testid="stBaseButton-primary"]::after,
-.stButton > button[kind="primary"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-120%);
-  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
-  transition: transform 0.7s var(--ease);
-}
-
-.stButton > button[data-testid="stBaseButton-primary"]:hover::after,
-.stButton > button[kind="primary"]:hover::after {
-  transform: translateX(120%);
-}
-
-/* ---------- 3D Perspective Tilt & Contained Media Cards ---------- */
-[data-testid="stImage"] {
-  display: inline-flex !important;
-  position: relative !important;
-  width: fit-content !important;
-  max-width: 100% !important;
-  margin: 0.8rem 0;
-}
-
-[data-testid="stImage"] > div {
-  position: relative !important;
-  width: fit-content !important;
-  display: inline-block !important;
-}
-
-[data-testid="stImage"] .stImageHoverButton,
-[data-testid="stImage"] [data-testid="StyledFullScreenButton"] {
-  position: absolute !important;
-  top: 10px !important;
-  right: 10px !important;
-  left: auto !important;
-  z-index: 25 !important;
-  opacity: 0.85 !important;
-  transition: opacity 0.2s ease, transform 0.2s ease !important;
-}
-
-[data-testid="stImage"]:hover .stImageHoverButton,
-[data-testid="stImage"]:hover [data-testid="StyledFullScreenButton"] {
-  opacity: 1 !important;
-  transform: scale(1.05) !important;
-}
-
-[data-testid="stImage"] img {
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 30px 80px -30px var(--a1);
-  max-height: 440px !important;
-  width: auto !important;
-  max-width: 100% !important;
-  object-fit: contain !important;
-  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-  transition: transform 0.25s var(--ease);
-}
-
-[data-testid="stVideo"] {
-  margin: 0.8rem 0;
-}
-
-[data-testid="stVideo"] video {
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 30px 80px -30px var(--a2);
-  max-height: 440px !important;
-  width: 100% !important;
-  object-fit: contain !important;
-}
-
-/* ---------- Laser Scanning Spinner ---------- */
-[data-testid="stSpinner"] {
-  position: relative;
-  padding: 0.8rem 1.1rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-[data-testid="stSpinner"]::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 2px;
-  width: 40%;
-  background: linear-gradient(90deg, transparent, var(--a1), var(--a2), transparent);
-  animation: scan 1.4s ease-in-out infinite;
-}
-
-@keyframes scan {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(280%); }
-}
-
-/* ---------- Health Snapshot Grid ---------- */
-.ph {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 0.75rem;
-  margin: 0.4rem 0 1rem;
-}
-
-.ph .cell {
-  padding: 0.75rem 0.95rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.ph .cell b {
-  display: block;
-  font: 600 0.84rem 'Inter', sans-serif;
-  color: #e2e8f0;
-}
-
-.ph .cell i {
-  font: 500 0.76rem var(--mono);
-  color: #94a3b8;
-  font-style: normal;
-}
-
-.ph .cell.up { border-color: rgba(52, 211, 153, 0.35); }
-.ph .cell.down { border-color: rgba(251, 191, 36, 0.35); }
-
-/* ---------- Lite Mode Suppression ---------- */
-.stApp:has(#fx-flags[data-lite="1"])::before,
-.stApp:has(#fx-flags[data-lite="1"])::after { display: none !important; }
-.stApp:has(#fx-flags[data-lite="1"]) .hx-wrap::after,
-.stApp:has(#fx-flags[data-lite="1"]) .hx-ring,
-.stApp:has(#fx-flags[data-lite="1"]) .hx-core,
-.stApp:has(#fx-flags[data-lite="1"]) .brand-mark,
-.stApp:has(#fx-flags[data-lite="1"]) .hx-title { animation: none !important; }
-.stApp:has(#fx-flags[data-lite="1"]) .hx-slot { display: none !important; }
-
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-  .hx-slot { display: none !important; }
-}
-
-
-
-/* ---------- Google Colab GPU Bridge Dock Styling ---------- */
-[class*="st-key-panel_colab_dock"] {
-  background: linear-gradient(135deg, rgba(16, 20, 34, 0.82), rgba(8, 10, 18, 0.95)) !important;
-  border: 1px solid rgba(34, 211, 238, 0.28) !important;
-  border-radius: 18px !important;
-  padding: 1.25rem 1.6rem !important;
-  margin-bottom: 1.5rem !important;
-  box-shadow: 0 18px 45px -15px rgba(6, 182, 212, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-}
-
-/* Hardware selector radio pill group */
-div[data-testid="stRadio"]:has(input[name*="tab3_hw_engine_selector"]) [role="radiogroup"] {
-  gap: 0.75rem !important;
-}
-
-div[data-testid="stRadio"]:has(input[name*="tab3_hw_engine_selector"]) label {
-  background: rgba(15, 18, 28, 0.7) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 10px !important;
-  padding: 8px 14px !important;
-  transition: all 0.2s ease !important;
-}
-
-div[data-testid="stRadio"]:has(input[name*="tab3_hw_engine_selector"]) label:hover {
-  border-color: #22d3ee !important;
-  background: rgba(34, 211, 238, 0.08) !important;
-}
-
-/* ---------- GetLayers X Figma Chat Styling & Downward Fix ---------- */
-[data-testid="stChatMessage"] {
-  padding: 1.15rem 1.4rem !important;
-  border-radius: 18px !important;
-  margin-bottom: 1.1rem !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-
-/* User Message: Sleek deep-ink with indigo highlight */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]),
-[data-testid="stChatMessage"]:has(img[src*="avatar_user"]) {
-  background: linear-gradient(135deg, rgba(24, 30, 52, 0.8), rgba(14, 18, 32, 0.9)) !important;
-  border: 1px solid rgba(99, 102, 241, 0.32) !important;
-  box-shadow: 0 10px 28px -10px rgba(99, 102, 241, 0.25) !important;
-}
-
-/* Assistant Message: Obsidian glass panel */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]),
-[data-testid="stChatMessage"]:has(img[src*="avatar_assistant"]) {
-  background: linear-gradient(135deg, rgba(14, 17, 26, 0.85), rgba(8, 10, 18, 0.95)) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.85) !important;
-}
-
-/* Figma-style rounded avatar frames - STRICTLY LOCKED TO 36px */
-[data-testid="stChatMessageAvatar"],
-.stChatMessage [data-testid="stChatMessageAvatar"],
-div[data-testid="stChatMessageAvatar"] {
-  border-radius: 10px !important;
-  width: 36px !important;
-  min-width: 36px !important;
-  max-width: 36px !important;
-  height: 36px !important;
-  min-height: 36px !important;
-  max-height: 36px !important;
-  overflow: hidden !important;
-  background: rgba(12, 15, 24, 0.95) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex: 0 0 36px !important;
-}
-
-[data-testid="stChatMessageAvatar"] img,
-[data-testid="stChatMessageAvatar"] svg,
-.stChatMessage [data-testid="stChatMessageAvatar"] img,
-.stChatMessage [data-testid="stChatMessageAvatar"] svg,
-img[src*="avatar_user"],
-img[src*="avatar_assistant"] {
-  width: 36px !important;
-  min-width: 36px !important;
-  max-width: 36px !important;
-  height: 36px !important;
-  min-height: 36px !important;
-  max-height: 36px !important;
-  border-radius: 8px !important;
-  object-fit: cover !important;
-  display: block !important;
-}
-
-/* Floating Figma Bottom Chat Input Bar */
-[data-testid="stBottom"] {
-  background: transparent !important;
-  pointer-events: none !important;
-}
-
-[data-testid="stBottom"] > * {
-  pointer-events: auto !important;
-}
-
-[data-testid="stChatInput"] {
-  max-width: 960px !important;
-  margin: 0 auto !important;
-  border-radius: 18px !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  background: rgba(12, 14, 22, 0.95) !important;
-  backdrop-filter: blur(18px) !important;
-  -webkit-backdrop-filter: blur(18px) !important;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
-  transition: all 0.25s ease !important;
-  padding: 4px 8px !important;
-}
-
-[data-testid="stChatInput"]:focus-within {
-  border-color: #22d3ee !important;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9), 0 0 24px -2px rgba(34, 211, 238, 0.45) !important;
-}
-
-[data-testid="stChatInput"] textarea {
-  font-family: var(--font) !important;
-  font-size: 0.95rem !important;
-  color: #f8fafc !important;
-  caret-color: #22d3ee !important;
-}
-
-[data-testid="stChatInput"] button {
-  border-radius: 12px !important;
-  background: linear-gradient(135deg, #6366f1, #22d3ee) !important;
-  color: #ffffff !important;
+.tab-sub {
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* Form Inputs, Selectboxes, File Uploaders */
+div[data-baseweb="select"] > div,
+input[type="text"],
+textarea {
+  background: var(--panel-card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-primary) !important;
+  font-size: 0.88rem !important;
+}
+
+div[data-baseweb="select"] > div:hover,
+input[type="text"]:hover,
+textarea:hover {
+  border-color: var(--border-strong) !important;
+}
+
+div[data-baseweb="select"] > div:focus-within,
+input[type="text"]:focus,
+textarea:focus {
+  border-color: var(--border-focus) !important;
+}
+
+/* Clean Primary Action Buttons */
+button[kind="primary"],
+.stButton > button[kind="primary"] {
+  background: var(--btn-primary-bg) !important;
+  color: var(--btn-primary-text) !important;
   border: none !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border-radius: var(--radius-sm) !important;
+  font-weight: 600 !important;
+  font-size: 0.88rem !important;
+  padding: 0.55rem 1.2rem !important;
+  transition: all var(--ease-snappy) !important;
 }
 
-[data-testid="stChatInput"] button:hover {
-  transform: scale(1.1) !important;
-  box-shadow: 0 0 18px rgba(34, 211, 238, 0.7) !important;
+button[kind="primary"]:hover,
+.stButton > button[kind="primary"]:hover {
+  background: #e4e4e7 !important;
 }
 
-
-
-
-
-/* =====================================================================
-   Fullscreen Frame, Minimize Button & Dialog Visibility Guarantees
-   ===================================================================== */
-[data-testid="stFullScreenFrame"] {
-  z-index: 2147483640 !important;
-  background: rgba(7, 8, 13, 0.98) !important;
+button[kind="primary"]:active,
+.stButton > button[kind="primary"]:active {
+  transform: scale(0.98) !important;
 }
 
-/* Ensure Streamlit header, deploy toolbar, and sidebar expand/collapse controls never disappear */
-header[data-testid="stHeader"],
-[data-testid="stHeader"] {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  z-index: 999 !important;
-  background: transparent !important;
-  border-bottom: none !important;
-  box-shadow: none !important;
-  pointer-events: none !important;
-}
-
-[data-testid="stToolbar"] {
-  pointer-events: none !important;
-}
-
-[data-testid="stToolbarActions"],
-[data-testid="stToolbar"] > *,
-[data-testid="stMainMenuButton"],
-button[data-testid="stBaseButton-header"] {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  z-index: 1000 !important;
-  pointer-events: auto !important;
-}
-
-section[data-testid="stSidebar"] {
-  z-index: 9999 !important;
-}
-
-[data-testid="stSidebarCollapseButton"] {
-  z-index: 10002 !important;
-  pointer-events: auto !important;
-  display: flex !important;
-}
-
-[data-testid="stSidebarCollapseButton"] button {
-  pointer-events: auto !important;
-  cursor: pointer !important;
-  display: flex !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-[data-testid="stExpandSidebarButton"],
-[data-testid="stSidebarCollapsedControl"],
-[data-testid="collapsedControl"] {
-  position: fixed !important;
-  top: 1rem !important;
-  left: 1rem !important;
-  z-index: 10002 !important;
-  pointer-events: auto !important;
-  display: flex !important;
-  background: rgba(18, 22, 34, 0.9) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-}
-
-[data-testid="stFullScreenFrame"] button,
-button[aria-label*="Close fullscreen" i],
-button[title*="Exit fullscreen" i],
-button[title*="Close fullscreen" i] {
-  position: fixed !important;
-  top: 1.25rem !important;
-  right: 1.5rem !important;
-  z-index: 2147483647 !important;
-  background: #ef4444 !important;
-  color: #ffffff !important;
-  border: 2px solid #ffffff !important;
-  border-radius: 9999px !important;
-  padding: 0.55rem 1.35rem !important;
-  font-weight: 700 !important;
-  font-size: 0.95rem !important;
-  box-shadow: 0 4px 25px rgba(239, 68, 68, 0.85), 0 0 15px rgba(255, 255, 255, 0.5) !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.5rem !important;
-  transition: transform 0.15s ease, background 0.15s ease !important;
-}
-
-[data-testid="stFullScreenFrame"] button:hover,
-button[aria-label*="Close fullscreen" i]:hover,
-button[title*="Exit fullscreen" i]:hover {
-  background: #dc2626 !important;
-  transform: scale(1.05) !important;
-}
-
-div[role="dialog"] button[aria-label="Close"],
-[data-testid="stDialog"] button[aria-label="Close"] {
-  background: rgba(239, 68, 68, 0.2) !important;
-  border: 1px solid rgba(239, 68, 68, 0.5) !important;
-  color: #fca5a5 !important;
-  border-radius: 8px !important;
-  padding: 4px 8px !important;
-  transition: all 0.2s ease !important;
-}
-
-div[role="dialog"] button[aria-label="Close"]:hover,
-[data-testid="stDialog"] button[aria-label="Close"]:hover {
-  background: #ef4444 !important;
-  color: #ffffff !important;
-  box-shadow: 0 0 15px rgba(239, 68, 68, 0.6) !important;
-}
-
-
-/* =====================================================================
-   Studio Segmented Tab Switching Interface
-   ===================================================================== */
-[data-testid="stLayoutWrapper"]:has(.st-key-nav_wrapper),
-[data-testid="stElementContainer"]:has(.st-key-nav_wrapper),
-[data-testid="stLayoutWrapper"]:has(.st-key-hub_nav_segmented),
-[data-testid="stElementContainer"]:has(.st-key-hub_nav_segmented),
-[data-testid="stLayoutWrapper"]:has(.st-key-hub_nav_radio),
-[data-testid="stElementContainer"]:has(.st-key-hub_nav_radio) {
-  display: contents !important;
-}
-
-.st-key-nav_wrapper,
-.st-key-hub_nav_segmented,
-.st-key-hub_nav_radio,
-.st-key-nav {
-  position: sticky !important;
-  top: 3.75rem !important;
-  z-index: 990 !important;
-  width: 100% !important;
-  background: rgba(10, 12, 20, 0.45) !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-  padding: 0.2rem 0 !important;
-  margin: 0 0 0.75rem 0 !important;
-  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.35) !important;
-}
-
-div[data-testid="stSegmentedControl"],
-.st-key-hub_nav_segmented div[data-testid="stSegmentedControl"] {
-  max-width: 980px !important;
-  margin: 0 auto !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  background: rgba(14, 17, 26, 0.45) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 14px !important;
-  padding: 3px !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.25) !important;
-}
-
-div[data-testid="stSegmentedControl"] button {
-  border: 1px solid transparent !important;
-  border-radius: 12px !important;
-  padding: 0.55rem 1.35rem !important;
-  font-size: 0.92rem !important;
+/* Clean Secondary Action Buttons */
+.stButton > button:not([kind="primary"]) {
+  background: var(--btn-secondary-bg) !important;
+  border: 1px solid var(--btn-secondary-border) !important;
+  color: var(--btn-secondary-text) !important;
+  border-radius: var(--radius-sm) !important;
   font-weight: 500 !important;
-  color: #94a3b8 !important;
-  background: transparent !important;
-  cursor: pointer !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  white-space: nowrap !important;
+  font-size: 0.86rem !important;
+  transition: all var(--ease-snappy) !important;
 }
 
-div[data-testid="stSegmentedControl"] button:hover {
-  color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.07) !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
-  transform: translateY(-1px) !important;
+.stButton > button:not([kind="primary"]):hover {
+  background: var(--panel-hover) !important;
+  border-color: var(--border-strong) !important;
 }
 
-div[data-testid="stSegmentedControl"] button[aria-checked="true"],
-div[data-testid="stSegmentedControl"] button[aria-selected="true"],
-div[data-testid="stSegmentedControl"] button[data-active="true"] {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(34, 211, 238, 0.3)) !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-  border: 1px solid rgba(99, 102, 241, 0.7) !important;
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-  transform: translateY(0) !important;
+.stButton > button:not([kind="primary"]):active {
+  transform: scale(0.98) !important;
 }
 
-/* Fallback st.radio */
-.st-key-nav_wrapper [role="radiogroup"],
-.st-key-hub_nav_radio [role="radiogroup"],
-.st-key-nav [role="radiogroup"] {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  justify-content: center !important;
-  align-items: center !important;
-  gap: 0.4rem !important;
-  max-width: 980px !important;
-  margin: 0 auto !important;
-  padding: 4px !important;
-  background: rgba(18, 21, 31, 0.85) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 16px !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 20px rgba(0, 0, 0, 0.4) !important;
-}
-
-.st-key-nav_wrapper [role="radiogroup"] input[type="radio"],
-.st-key-nav_wrapper [role="radiogroup"] label > div:first-child,
-.st-key-nav_wrapper [role="radiogroup"] label svg,
-.st-key-nav_wrapper [data-baseweb="radio"] > div:first-child,
-.st-key-hub_nav_radio [role="radiogroup"] input[type="radio"],
-.st-key-hub_nav_radio [role="radiogroup"] label > div:first-child,
-.st-key-hub_nav_radio [role="radiogroup"] label svg,
-.st-key-hub_nav_radio [data-baseweb="radio"] > div:first-child,
-.st-key-nav [role="radiogroup"] input[type="radio"],
-.st-key-nav [role="radiogroup"] label > div:first-child,
-.st-key-nav [role="radiogroup"] label svg,
-.st-key-nav [data-baseweb="radio"] > div:first-child {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  position: absolute !important;
-  pointer-events: none !important;
-}
-
-.st-key-nav_wrapper [role="radiogroup"] label,
-.st-key-hub_nav_radio [role="radiogroup"] label,
-.st-key-nav [role="radiogroup"] label {
-  margin: 0 !important;
-  padding: 0.55rem 1.35rem !important;
-  border-radius: 12px !important;
-  cursor: pointer !important;
-  color: #94a3b8 !important;
-  white-space: nowrap !important;
-  border: 1px solid transparent !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  font-size: 0.92rem !important;
-  font-weight: 500 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  user-select: none !important;
-}
-
-.st-key-nav_wrapper [role="radiogroup"] label:hover,
-.st-key-hub_nav_radio [role="radiogroup"] label:hover,
-.st-key-nav [role="radiogroup"] label:hover {
-  background: rgba(255, 255, 255, 0.07) !important;
-  color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
-  transform: translateY(-1px) !important;
-}
-
-.st-key-nav_wrapper [role="radiogroup"] label:has(input:checked),
-.st-key-hub_nav_radio [role="radiogroup"] label:has(input:checked),
-.st-key-nav [role="radiogroup"] label:has(input:checked) {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(34, 211, 238, 0.3)) !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-  border: 1px solid rgba(99, 102, 241, 0.7) !important;
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-  transform: translateY(0) !important;
-}
-
-.st-key-nav_wrapper [role="radiogroup"] label:has(input:checked) *,
-.st-key-hub_nav_radio [role="radiogroup"] label:has(input:checked) *,
-.st-key-nav [role="radiogroup"] label:has(input:checked) * {
-  color: #ffffff !important;
-  font-weight: 600 !important;
-}
-
-/* Claude / ChatGPT-style Floating Down-Arrow Button */
+/* ---------- Zero Shutter Native Scroll & Micro-Animations ---------- */
 .fx-scroll-bottom-btn {
   position: fixed !important;
   bottom: 5.85rem !important;
   left: 50% !important;
-  transform: translate(-50%, 10px) scale(0.9) !important;
-  width: 42px !important;
-  height: 42px !important;
+  transform: translate(-50%, 0) !important;
+  width: 36px !important;
+  height: 36px !important;
   border-radius: 50% !important;
-  background: rgba(18, 22, 34, 0.94) !important;
-  border: 1px solid rgba(99, 102, 241, 0.5) !important;
-  color: #38bdf8 !important;
+  background: #18181b !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--text-primary) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 15px rgba(99, 102, 241, 0.35) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
   cursor: pointer !important;
-  z-index: 998 !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease !important;
-  pointer-events: none !important;
-}
-
-.fx-scroll-bottom-btn.visible {
-  opacity: 1 !important;
-  visibility: visible !important;
-  transform: translate(-50%, 0) scale(1) !important;
-  pointer-events: auto !important;
+  transition: all var(--ease-snappy) !important;
 }
 
 .fx-scroll-bottom-btn:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(34, 211, 238, 0.35)) !important;
-  color: #ffffff !important;
-  border-color: rgba(34, 211, 238, 0.8) !important;
-  transform: translate(-50%, -2px) scale(1.08) !important;
-  box-shadow: 0 8px 25px rgba(34, 211, 238, 0.45) !important;
-}
-
-.fx-scroll-bottom-btn:active {
-  transform: translate(-50%, 1px) scale(0.96) !important;
-}
-
-/* Collapses hidden TTS streaming iframes so they add no blank layout gaps */
-[class*="st-key-tts_sink"] {
-  position: absolute !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
+  background: var(--panel-hover) !important;
+  border-color: var(--border-focus) !important;
+  transform: translate(-50%, -2px) !important;
 }

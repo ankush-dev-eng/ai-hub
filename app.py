@@ -18,9 +18,15 @@ import httpx
 import subprocess
 import math
 
-# Add src to path for session_manager
+# Add src to path for session_manager and studio_components with hot-reload resilience
+import importlib
 ROOT_DIR = Path(__file__).parent.resolve()
-sys.path.append(str(ROOT_DIR / "src"))
+src_dir_str = str(ROOT_DIR / "src")
+if src_dir_str not in sys.path:
+    sys.path.insert(0, src_dir_str)
+
+import studio_components
+importlib.reload(studio_components)
 from studio_components import (
     esc,
     fx_flags,
@@ -28,8 +34,13 @@ from studio_components import (
     gen_log,
     provider_health_html,
     model_matrix_cards_html,
-    brand_html
+    brand_html,
+    saas_quota_html,
+    saas_topbar_html
 )
+
+import session_manager
+importlib.reload(session_manager)
 from session_manager import (
     generate_session_id,
     get_all_sessions,
@@ -73,21 +84,18 @@ STUDIO_CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700');
 
 :root{
-  --bg:#08090c; --bg-elev:#0d0f14;
+  --bg:#09090b; --bg-elev:#141417;
   --border:rgba(255,255,255,.08); --border-strong:rgba(255,255,255,.16);
-  --text:#f1f5f9; --muted:#94a3b8;
-  --accent:#6366f1; --cyan:#38bdf8;
-  --ok:#34d399; --warn:#fbbf24;
-  --ring:0 0 0 3px rgba(99,102,241,.32);
+  --text:#f4f4f5; --muted:#a1a1aa;
+  --accent:#ffffff; --cyan:#a1a1aa;
+  --ok:#22c55e; --warn:#eab308;
+  --ring:0 0 0 1px rgba(255,255,255,.2);
   --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 }
 
 /* ---------- Base ---------- */
 .stApp{
-  background:
-    radial-gradient(900px 420px at 8% -8%, rgba(99,102,241,.16), transparent 60%),
-    radial-gradient(700px 360px at 100% 0%, rgba(56,189,248,.07), transparent 60%),
-    var(--bg);
+  background: var(--bg) !important;
   color:var(--text); font-family:var(--font); color-scheme:dark;
 }
 header[data-testid="stHeader"],
@@ -106,7 +114,11 @@ header[data-testid="stHeader"],
   pointer-events: none !important;
 }
 [data-testid="stToolbarActions"],
-[data-testid="stToolbar"] > *,
+[data-testid="stToolbarActions"] *,
+[data-testid="stAppDeployButton"],
+[data-testid="stAppDeployButton"] *,
+[data-testid="stMainMenu"],
+[data-testid="stMainMenu"] *,
 [data-testid="stMainMenuButton"],
 button[data-testid="stBaseButton-header"] {
   pointer-events: auto !important;
@@ -176,13 +188,13 @@ div[data-baseweb="input"]:focus-within,div[data-baseweb="textarea"]:focus-within
 .stButton > button:active,.stDownloadButton > button:active{transform:translateY(0) scale(.99)}
 .stButton > button:focus-visible,.stDownloadButton > button:focus-visible{outline:none;box-shadow:var(--ring)}
 .stButton > button[kind="primary"],.stButton > button[data-testid="stBaseButton-primary"]{
-  background:linear-gradient(180deg,#7578f5,#5557e6); color:#fff; font-weight:600;
-  border:1px solid rgba(255,255,255,.2);
-  box-shadow:0 1px 0 rgba(255,255,255,.28) inset, 0 10px 26px -10px rgba(99,102,241,.85);
+  background:#ffffff !important; color:#09090b !important; font-weight:600 !important;
+  border:1px solid #ffffff !important;
+  box-shadow:0 1px 2px rgba(0,0,0,.15) !important;
 }
 .stButton > button[kind="primary"]:hover,.stButton > button[data-testid="stBaseButton-primary"]:hover{
-  background:linear-gradient(180deg,#8487f8,#5f61ec);
-  box-shadow:0 1px 0 rgba(255,255,255,.3) inset, 0 14px 32px -10px rgba(99,102,241,.95);
+  background:#e4e4e7 !important; border-color:#e4e4e7 !important; color:#09090b !important;
+  box-shadow:0 2px 4px rgba(0,0,0,.2) !important;
 }
 
 /* ---------- Tabs ---------- */
@@ -194,19 +206,20 @@ div[data-baseweb="input"]:focus-within,div[data-baseweb="textarea"]:focus-within
 }
 .stTabs [data-baseweb="tab"]:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .stTabs [aria-selected="true"]{color:var(--text)}
-.stTabs [data-baseweb="tab-highlight"]{background:linear-gradient(90deg,var(--accent),var(--cyan));height:2px}
+.stTabs [data-baseweb="tab-highlight"]{background:#ffffff;height:2px}
 .stTabs [data-baseweb="tab-border"]{display:none}
 
 /* ---------- Sidebar ---------- */
-section[data-testid="stSidebar"]{background:var(--bg-elev);border-right:1px solid var(--border);z-index:9999 !important}
-[data-testid="stSidebarCollapseButton"]{z-index:10002 !important;pointer-events:auto !important;display:flex !important}
+section[data-testid="stSidebar"], [data-testid="stSidebar"]{background:var(--bg-elev);border-right:1px solid var(--border);z-index:1000005 !important}
+[data-testid="stSidebarCollapseButton"]{z-index:1000010 !important;pointer-events:auto !important;display:flex !important}
 [data-testid="stSidebarCollapseButton"] button{pointer-events:auto !important;cursor:pointer !important;display:flex !important;opacity:1 !important;visibility:visible !important}
-[data-testid="stExpandSidebarButton"]{position:fixed !important;top:1rem !important;left:1rem !important;z-index:10002 !important;pointer-events:auto !important;display:flex !important;background:rgba(18,22,34,0.9) !important;border:1px solid rgba(255,255,255,0.15) !important;border-radius:8px !important;box-shadow:0 4px 12px rgba(0,0,0,0.4) !important}
+[data-testid="stExpandSidebarButton"]{position:fixed !important;top:1rem !important;left:1rem !important;z-index:1000010 !important;pointer-events:auto !important;display:flex !important;background:rgba(18,22,34,0.9) !important;border:1px solid rgba(255,255,255,0.15) !important;border-radius:8px !important;box-shadow:0 4px 12px rgba(0,0,0,0.4) !important}
+[data-testid="stExpandSidebarButton"] button{pointer-events:auto !important;cursor:pointer !important}
 .brand{display:flex;align-items:center;gap:.7rem;margin:.2rem 0 1rem}
 .brand-mark{
   width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:1.05rem;flex:none;
-  background:linear-gradient(145deg,#7c7ff7,#4f46e5);
-  box-shadow:0 0 0 1px rgba(255,255,255,.18) inset, 0 8px 20px -8px rgba(99,102,241,.8);
+  background:#27272a; border:1px solid rgba(255,255,255,.12); color:#ffffff;
+  box-shadow:none;
 }
 .brand-name{font-weight:600;font-size:.98rem;letter-spacing:-.01em}
 .brand-sub{font-size:.76rem;color:var(--muted)}
@@ -218,7 +231,7 @@ section[data-testid="stSidebar"]{background:var(--bg-elev);border-right:1px soli
 .tele-lbl{font-size:.72rem;color:var(--muted);margin-top:2px}
 .side-label{font-size:.8rem;font-weight:600;color:var(--muted);margin:1.1rem 0 .45rem}
 .session-badge{display:flex;align-items:center;gap:.55rem;font-size:.82rem;padding:.5rem .75rem;border-radius:10px;
-  background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);margin:.6rem 0 .2rem}
+  background:rgba(255,255,255,.04);border:1px solid var(--border);margin:.6rem 0 .2rem}
 .session-badge span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ---------- Status ---------- */
@@ -242,15 +255,15 @@ section[data-testid="stSidebar"]{background:var(--bg-elev);border-right:1px soli
 .tab-title{font-size:1.25rem;font-weight:600;letter-spacing:-.02em}
 .tab-sub{color:var(--muted);font-size:.9rem;margin-top:.2rem;max-width:70ch}
 [class*="st-key-panel"]{
-  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
-  border:1px solid var(--border); border-radius:16px; padding:1.25rem;
-  box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 24px 48px -32px rgba(0,0,0,.9);
+  background:rgba(24,24,27,.6);
+  border:1px solid var(--border); border-radius:14px; padding:1.25rem;
+  box-shadow:none;
 }
 .panel-title{display:flex;align-items:center;gap:.6rem;font-weight:600;font-size:1.02rem;letter-spacing:-.01em}
 .panel-hint{color:var(--muted);font-size:.84rem;margin:.1rem 0 .6rem;line-height:1.45}
 .step{display:flex;align-items:center;gap:.6rem;margin:.5rem 0 .15rem}
 .step-n{width:20px;height:20px;border-radius:6px;display:inline-grid;place-items:center;font-size:.7rem;font-weight:600;
-  color:#c7d2fe;background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.35);font-variant-numeric:tabular-nums}
+  color:#ffffff;background:#27272a;border:1px solid rgba(255,255,255,.14);font-variant-numeric:tabular-nums}
 .step-t{font-weight:600;font-size:.92rem}
 .step-d{color:var(--muted);font-size:.82rem}
 .field-label{font-size:.8rem;font-weight:500;color:var(--muted);margin:0 0 .45rem}
@@ -274,24 +287,24 @@ kbd{border:1px solid var(--border-strong);border-bottom-width:2px;border-radius:
 .cred b{display:block;font-size:.88rem;margin-bottom:.45rem}
 
 /* ---------- Chat ---------- */
-[data-testid="stChatMessage"]{background:rgba(255,255,255,.025);border:1px solid var(--border);
-  border-radius:14px;padding:.95rem 1.1rem;margin-bottom:.7rem;gap:.8rem}
+[data-testid="stChatMessage"]{background:transparent;border:none;
+  padding:.85rem 0;margin-bottom:.4rem;gap:.8rem}
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]),
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]){
-  background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.22)}
-[data-testid="stChatInput"]{border-radius:14px;border:1px solid var(--border-strong);background:#0b0c10;
+  background:transparent;border:none}
+[data-testid="stChatInput"]{border-radius:18px;border:1px solid var(--border-strong);background:#18181b;
   transition:border-color .15s ease, box-shadow .15s ease}
-[data-testid="stChatInput"]:focus-within{border-color:var(--accent);box-shadow:var(--ring)}
+[data-testid="stChatInput"]:focus-within{border-color:rgba(255,255,255,.3);box-shadow:none}
 
 /* ---------- Uploader, expanders, alerts, code ---------- */
-[data-testid="stFileUploaderDropzone"]{background:rgba(99,102,241,.04);border:1.5px dashed rgba(99,102,241,.38);
-  border-radius:14px;transition:border-color .15s ease, background .15s ease}
-[data-testid="stFileUploaderDropzone"]:hover{border-color:var(--accent);background:rgba(99,102,241,.09)}
+[data-testid="stFileUploaderDropzone"]{background:rgba(255,255,255,.02);border:1px dashed rgba(255,255,255,.14);
+  border-radius:12px;transition:border-color .15s ease, background .15s ease}
+[data-testid="stFileUploaderDropzone"]:hover{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.04)}
 [data-testid="stExpander"]{border:1px solid var(--border) !important;border-radius:12px !important;
   background:rgba(255,255,255,.02)}
 [data-testid="stExpander"] summary:hover{background:rgba(255,255,255,.03)}
 [data-testid="stAlert"]{border-radius:12px;border:1px solid var(--border)}
-pre,[data-testid="stCode"] pre{background:#0b0c10 !important;border:1px solid var(--border);border-radius:10px}
+pre,[data-testid="stCode"] pre{background:#121215 !important;border:1px solid var(--border);border-radius:8px}
 
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation:none !important;transition:none !important}
@@ -343,8 +356,10 @@ STUDIO_JS = """
 THEME_CSS_PATH = Path(__file__).parent / "src" / "studio_theme.css"
 theme_css = ""
 if THEME_CSS_PATH.exists():
-    with open(THEME_CSS_PATH, "r", encoding="utf-8") as f:
-        theme_css = f.read()
+    try:
+        theme_css = THEME_CSS_PATH.read_text(encoding="utf-8")
+    except Exception:
+        theme_css = ""
 
 st.markdown("<style>" + STUDIO_CSS + "\n" + theme_css + "</style>", unsafe_allow_html=True)
 
@@ -1623,22 +1638,38 @@ def get_git_info() -> dict:
 
     return info
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def get_user_github_repos(account: str = "ankush-dev-eng") -> list[dict]:
-    """Queries user's GitHub repositories via public API and gh CLI, falling back to verified repository roster."""
+    """Queries user's GitHub repositories dynamically via gh CLI (including private & newly created repos) with REST API fallback."""
     account = (account or "ankush-dev-eng").strip()
-    default_repos = [
-        {"name": "ai-hub", "description": "Multi-Model AI Prototyping Studio (Gemini + Groq + FLUX)", "default_file": "app.py"},
-        {"name": "NiveshRakshak", "description": "AI-Powered Financial Safety & Message Fraud Analyzer", "default_file": "backend/main.py"},
-        {"name": "pakka", "description": "AI Fraud Analyst for Student Inboxes & Job Offers", "default_file": "app.py"},
-        {"name": "TutorForge-AI", "description": "AI Study Companion & Adaptive Tutor", "default_file": "app.py"},
-        {"name": "SnapExplain", "description": "Privacy-First AI Study Assistant for Notes", "default_file": "app.py"},
-        {"name": "ParallelRC-3D-Lab", "description": "3D Virtual Laboratory for Parallel RC Circuits", "default_file": "app.py"},
-        {"name": "inkloom", "description": "Specialised AI Models for Brand Identity & Logo Design", "default_file": "app.py"},
-        {"name": "ecopulse", "description": "AI-Powered Sustainable Supply Chain & Carbon Calculator", "default_file": "app.py"},
-        {"name": "pulsecheck-ai", "description": "AI-Powered Emergency Response & SOS Hub", "default_file": "app.py"}
-    ]
-    # 1. Live Public GitHub API
+    
+    # 1. Primary: gh CLI with authenticated user credentials (instant live data, includes private repos, no rate limits)
+    try:
+        res = subprocess.run(
+            ["gh", "repo", "list", account, "--limit", "100", "--json", "name,description,defaultBranchRef,visibility,updatedAt"],
+            capture_output=True, text=True, timeout=8
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            data = json.loads(res.stdout)
+            repos = []
+            for item in data:
+                name = item.get("name", "")
+                if not name:
+                    continue
+                desc = item.get("description", "") or ""
+                branch = item.get("defaultBranchRef", {}).get("name", "main") if item.get("defaultBranchRef") else "main"
+                repos.append({
+                    "name": name,
+                    "description": desc,
+                    "default_branch": branch,
+                    "visibility": item.get("visibility", "PUBLIC")
+                })
+            if repos:
+                return repos
+    except Exception:
+        pass
+
+    # 2. Secondary: Public GitHub REST API
     try:
         req = urllib.request.Request(
             f"https://api.github.com/users/{urllib.parse.quote(account)}/repos?per_page=100&sort=updated",
@@ -1650,43 +1681,50 @@ def get_user_github_repos(account: str = "ankush-dev-eng") -> list[dict]:
                 api_repos = []
                 for item in api_data:
                     name = item.get("name", "")
+                    if not name:
+                        continue
                     desc = item.get("description", "") or ""
-                    def_file = "backend/main.py" if name == "NiveshRakshak" else "app.py"
-                    api_repos.append({"name": name, "description": desc, "default_file": def_file})
+                    branch = item.get("default_branch", "main")
+                    api_repos.append({
+                        "name": name,
+                        "description": desc,
+                        "default_branch": branch,
+                        "visibility": "PUBLIC"
+                    })
                 if api_repos:
                     return api_repos
     except Exception:
         pass
 
-    # 2. Local gh CLI fallback
-    try:
-        res = subprocess.run(
-            ["gh", "repo", "list", account, "--limit", "30", "--json", "name,description,visibility"],
-            capture_output=True, text=True, timeout=8
-        )
-        if res.returncode == 0 and res.stdout.strip():
-            data = json.loads(res.stdout)
-            repos = []
-            for item in data:
-                name = item.get("name", "")
-                desc = item.get("description", "") or ""
-                def_file = "backend/main.py" if name == "NiveshRakshak" else "app.py"
-                repos.append({"name": name, "description": desc, "default_file": def_file})
-            if repos:
-                return repos
-    except Exception:
-        pass
-    return default_repos
+    # 3. Dynamic local git fallback
+    git_info = get_git_info()
+    local_repo = git_info.get("repo_name", "ai-hub")
+    local_branch = git_info.get("branch", "main")
+    return [{"name": local_repo, "description": "Local Workspace Repository", "default_branch": local_branch, "visibility": "PUBLIC"}]
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def get_repo_python_files(account: str, repo: str, branch: str = "main") -> list[str]:
     """Dynamically inspects a GitHub repository tree to discover all Python files (.py) for zero-guesswork deployment."""
-    common_candidates = ["app.py", "backend/main.py", "main.py", "streamlit_app.py", "dashboard.py"]
-    account = (account or "ankush-dev-eng").strip()
+    common_candidates = ["app.py", "main.py", "streamlit_app.py", "dashboard.py"]
+    account = (account or "").strip()
     repo = (repo or "").strip()
     branch = (branch or "main").strip()
+
+    git_info = get_git_info()
+    if repo == git_info.get("repo_name") or repo == "ai-hub":
+        local_py = []
+        for p in Path.cwd().rglob("*.py"):
+            rel = str(p.relative_to(Path.cwd())).replace("\\", "/")
+            if not any(rel.startswith(d) for d in [".venv", "venv", "env", "test", "tests", ".pytest", ".git", "build", "dist"]):
+                local_py.append(rel)
+        if local_py:
+            ranked = [c for c in ["app.py", "main.py", "streamlit_app.py", "dashboard.py"] if c in local_py]
+            ranked += [f for f in local_py if f not in ranked]
+            return ranked
+
     if not repo or repo.startswith("➕"):
         return common_candidates
+
     try:
         url = f"https://api.github.com/repos/{urllib.parse.quote(account)}/{urllib.parse.quote(repo)}/git/trees/{urllib.parse.quote(branch)}?recursive=1"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/vnd.github.v3+json"})
@@ -1695,26 +1733,24 @@ def get_repo_python_files(account: str, repo: str, branch: str = "main") -> list
             files = [
                 item["path"] for item in data.get("tree", [])
                 if item.get("path", "").endswith(".py")
-                and not any(item.get("path", "").startswith(p) for p in [".venv", "venv", "env", "test", "tests", ".pytest"])
+                and not any(item.get("path", "").startswith(p) for p in [".venv", "venv", "env", "test", "tests", ".pytest", ".git"])
             ]
             if files:
-                # Prioritize primary entrypoints at the top
-                ranked = []
-                for c in ["backend/main.py", "app.py", "main.py", "streamlit_app.py", "dashboard.py"]:
-                    if c in files:
-                        ranked.append(c)
+                ranked = [c for c in ["app.py", "main.py", "streamlit_app.py", "dashboard.py"] if c in files]
                 for f in files:
                     if f not in ranked:
                         ranked.append(f)
                 return ranked
     except Exception:
         pass
-    return ["backend/main.py" if repo == "NiveshRakshak" else "app.py"] + [c for c in common_candidates if c != ("backend/main.py" if repo == "NiveshRakshak" else "app.py")]
+    return common_candidates
 
-def execute_github_publish(repo_name: str, account: str, is_public: bool, commit_msg: str, status_placeholder=None) -> tuple[bool, str, str]:
+def execute_github_publish(repo_name: str, account: str, is_public: bool, commit_msg: str, status_placeholder=None, branch: str = "main", entrypoint: str = "app.py") -> tuple[bool, str, str]:
     """Publishes current workspace to GitHub under user's account and returns (success, repo_url_or_err, deploy_url)."""
     repo_name = repo_name.strip()
     account = account.strip() or "ankush-dev-eng"
+    branch = branch.strip() or "main"
+    entrypoint = entrypoint.strip() or "app.py"
     if not repo_name:
         return False, "Repository name cannot be empty.", ""
 
@@ -1723,14 +1759,14 @@ def execute_github_publish(repo_name: str, account: str, is_public: bool, commit
             status_placeholder.info("Step 1/5: Verifying local Git repository & securing .gitignore secrets...")
         
         subprocess.run(["git", "init"], check=True, capture_output=True)
-        subprocess.run(["git", "checkout", "-B", "main"], check=True, capture_output=True)
+        subprocess.run(["git", "checkout", "-B", branch], check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", account], capture_output=True)
         subprocess.run(["git", "config", "user.email", f"{account}@users.noreply.github.com"], capture_output=True)
 
         if status_placeholder:
             status_placeholder.info("Step 2/5: Staging files and creating commit snapshot...")
         subprocess.run(["git", "add", "."], check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", commit_msg or "Deploy AI Hub v5.0 - Multi-Model Hackathon Studio"], capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-m", commit_msg or f"Deploy {repo_name} - Multi-Model Hackathon Studio"], capture_output=True, text=True)
         
         repo_full = f"{account}/{repo_name}"
         vis_flag = "--public" if is_public else "--private"
@@ -1741,28 +1777,33 @@ def execute_github_publish(repo_name: str, account: str, is_public: bool, commit
         chk = subprocess.run(["gh", "repo", "view", repo_full], capture_output=True, text=True)
         if chk.returncode != 0:
             if status_placeholder:
-                status_placeholder.info(f"Step 4/5: Creating new {vis_flag[2:]} repository '{repo_full}' and pushing code to GitHub...")
+                status_placeholder.info(f"Step 4/5: Creating new {vis_flag[2:]} repository '{repo_full}' on GitHub...")
             res = subprocess.run(
-                ["gh", "repo", "create", repo_full, vis_flag, "--source=.", "--remote=origin", "--push"],
+                ["gh", "repo", "create", repo_full, vis_flag, f"--default-branch={branch}"],
                 capture_output=True, text=True, timeout=60
             )
             comb = res.stderr + res.stdout
             if res.returncode != 0 and "already exists" not in comb:
-                raise Exception(f"GitHub CLI error: {comb}")
-        else:
-            if status_placeholder:
-                status_placeholder.info(f"Step 4/5: Setting origin remote to '{repo_full}' and pushing main branch...")
-            subprocess.run(["git", "remote", "remove", "origin"], capture_output=True)
-            subprocess.run(["git", "remote", "add", "origin", f"https://github.com/{repo_full}.git"], check=True, capture_output=True)
-            push_res = subprocess.run(["git", "push", "-u", "origin", "main", "--force"], capture_output=True, text=True, timeout=60)
-            if push_res.returncode != 0:
-                raise Exception(f"Push failed: {push_res.stderr or push_res.stdout}")
-
-        repo_url = f"https://github.com/{repo_full}"
-        deploy_url = f"https://share.streamlit.io/deploy?repository={repo_full}&branch=main&mainModule=app.py"
+                # Try create with basic flags
+                subprocess.run(["gh", "repo", "create", repo_full, vis_flag], capture_output=True, text=True, timeout=30)
         
         if status_placeholder:
-            status_placeholder.success(f"Step 5/5: Successfully published to GitHub: {repo_url}")
+            status_placeholder.info(f"Step 5/5: Connecting remote and pushing '{branch}' branch to GitHub...")
+        subprocess.run(["git", "remote", "remove", "origin"], capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", f"https://github.com/{repo_full}.git"], check=True, capture_output=True)
+        push_res = subprocess.run(["git", "push", "-u", "origin", branch, "--force"], capture_output=True, text=True, timeout=60)
+        if push_res.returncode != 0:
+            raise Exception(f"Push failed: {push_res.stderr or push_res.stdout}")
+
+        repo_url = f"https://github.com/{repo_full}"
+        deploy_url = f"https://share.streamlit.io/deploy?repository={urllib.parse.quote(repo_full)}&branch={urllib.parse.quote(branch)}&mainModule={urllib.parse.quote(entrypoint)}"
+        
+        # Invalidate cache so new repo immediately shows up
+        get_user_github_repos.clear()
+        get_repo_python_files.clear()
+
+        if status_placeholder:
+            status_placeholder.success(f"✓ Successfully published to GitHub: {repo_url}")
             
         return True, repo_url, deploy_url
     except Exception as e:
@@ -2099,10 +2140,6 @@ def on_vid_preset_change():
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
     ui(brand_html())
-    telemetry_ph = st.empty()
-    render_telemetry(telemetry_ph)
-
-    side_label("Conversations")
     uikit.render_sidebar_sessions()
 
     side_label("Access")
@@ -2166,26 +2203,32 @@ with st.sidebar:
 
     side_label("System tools")
     if btn("🚀 Deploy to Cloud & GitHub", help="Open GitHub & Live Streamlit Cloud Deployment Control Panel"):
-        import streamlit.components.v1 as components
-        components.html("<script>try{window.parent.__studioFx && window.parent.__studioFx.selectTab(3);}catch(e){}</script>", height=0)
+        st.session_state.nav_view = uikit.NAV[3]
+        st.session_state.hub_nav_segmented = uikit.NAV[3]
+        st.rerun()
 
     c_clear_cache, c_export_chat = st.columns([1.1, 0.9])
     with c_clear_cache:
         if btn("↻ Clear Cache", help="Clear app caches and temporary buffers"):
             st.cache_data.clear()
+            st.cache_resource.clear()
             st.toast("App cache cleared successfully!")
     with c_export_chat:
         md_export = ""
-        if st.session_state.chat_history:
-            md_export = f"# {st.session_state.current_session_title}\n\n"
-            for m in st.session_state.chat_history:
-                md_export += f"### {m['role'].capitalize()}\n{m['content']}\n\n"
+        active_sid = getattr(st.session_state, "active", None)
+        active_sess = st.session_state.get("sessions", {}).get(active_sid, {}) if active_sid else {}
+        active_msgs = active_sess.get("messages", [])
+        active_title = active_sess.get("title", "Chat")
+        if active_msgs:
+            md_export = f"# {active_title}\n\n"
+            for m in active_msgs:
+                md_export += f"### {m.get('role', 'user').capitalize()}\n{m.get('content', '')}\n\n"
         dl_btn(
             "↓ Export",
             data=md_export,
-            file_name=f"chat_{st.session_state.current_session_id}.md",
+            file_name=f"chat_{active_sid or 'export'}.md",
             mime="text/markdown",
-            disabled=not st.session_state.chat_history
+            disabled=not active_msgs
         )
 
     lite_fx = st.toggle(
@@ -2196,6 +2239,7 @@ with st.sidebar:
     ui(fx_flags(lite_fx))
     if lite_fx:
         st.markdown("<style>" + LITE_CSS + "</style>", unsafe_allow_html=True)
+    ui(saas_quota_html())
 
 # ----------------- HEADER (Atmospheric Beam & Orbital Nodes) -----------------
 pills_html = f"""
@@ -2213,7 +2257,7 @@ providers = [
     ("Hugging Face", bool(hf_token)),
     ("Adaption Labs", bool(adaption_key))
 ]
-ui(hero_html(providers, pills_html))
+ui(saas_topbar_html(providers))
 
 def generate(model: dict, messages: list, attachments: list):
     provider = model.get("provider", "Groq")
@@ -2226,7 +2270,7 @@ def generate(model: dict, messages: list, attachments: list):
         "Provide crisp, structured answers. "
         "When providing diagrams, always use valid Mermaid syntax starting with 'flowchart TD' "
         "on its own line, and enclose all node labels containing parentheses or spaces in double quotes: "
-        'e.g. id["Presentation Service (FastAPI)"].'
+        'e.g. id["Presentation Service (FastAPI)"]. Always complete all code blocks fully and close every opened subgraph with "end".'
     )
 
     # ---------------------------------------------------------
@@ -2363,6 +2407,7 @@ def generate(model: dict, messages: list, attachments: list):
                 model=actual_model,
                 messages=formatted,
                 temperature=0.7,
+                max_tokens=4096,
                 stream=True
             )
             for chunk in comp:
@@ -2457,7 +2502,7 @@ def generate(model: dict, messages: list, attachments: list):
             "Content-Type": "application/json"
         }
         formatted = [{"role": "system", "content": sys_prompt}] + messages
-        payload = {"model": actual_model, "messages": formatted, "stream": True}
+        payload = {"model": actual_model, "messages": formatted, "stream": True, "max_tokens": 4096}
         with httpx.Client(timeout=35.0) as client:
             with client.stream("POST", "https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload) as response:
                 if response.status_code != 200:
@@ -2525,23 +2570,7 @@ view = uikit.nav()
 # TAB 1: CONVERSATIONAL STUDIO
 # ===================================================
 if view == uikit.NAV[0]:
-    tab_header("Conversational Studio",
-               "Unified AI workspace with instant hot-swappable models, code & file attachments, and real-time streaming.")
-
-    mode_c1, mode_c2 = st.columns([6.5, 3.5])
-    with mode_c2:
-        active_chat_engine = st.pills(
-            "Studio Engine:",
-            options=["Studio Multi-Engine", "Universal Hub + RAG"],
-            default="Studio Multi-Engine",
-            key="chat_engine_switcher_pills"
-        )
-
-    if active_chat_engine == "Universal Hub + RAG":
-        import chat_hub
-        chat_hub.render_chat()
-    else:
-        uikit.render_chat(generate)
+    uikit.render_chat(generate)
 
 # ===================================================
 # TAB 2: VISUAL & DOCUMENT AUDITOR
@@ -2628,13 +2657,13 @@ elif view == uikit.NAV[1]:
 
                             try:
                                 response = client.models.generate_content(
-                                    model="gemini-3.5-flash",
+                                    model="gemini-3.8-flash",
                                     contents=contents
                                 )
                             except Exception:
                                 try:
                                     response = client.models.generate_content(
-                                        model="gemini-3.5-flash-lite",
+                                        model="gemini-2.5-flash-lite",
                                         contents=contents
                                     )
                                 except Exception:
@@ -2944,10 +2973,8 @@ elif view == uikit.NAV[2]:
                   Train custom visual LoRAs on faces, product lines, or brand aesthetics in 20 minutes directly on Colab and download the `.safetensors` weight.
                 """)
 
-    img_col, vid_col = st.columns(2, gap="large")
-
-    # ---- Image Studio ----
-    with img_col:
+    @st.fragment
+    def render_image_studio_panel(is_colab_selected: bool, hf_token: str):
         with st.container(key="panel_image"):
             panel_title("✦", "Cloud Image Studio", "FLUX.1-schnell & SDXL-Turbo up to 1024x1024.")
 
@@ -3085,8 +3112,8 @@ elif view == uikit.NAV[2]:
                             clear_keys=["tab3_4k_upscaled"]
                         )
 
-    # ---- Video Studio ----
-    with vid_col:
+    @st.fragment
+    def render_video_studio_panel(is_colab_selected: bool, hf_token: str):
         with st.container(key="panel_video"):
             panel_title("▶", "Cloud Video Studio", "Multi-Scene Storyboard Director (20-30s Unlimited MP4) & Real Diffusion Motion.")
 
@@ -3284,79 +3311,91 @@ elif view == uikit.NAV[2]:
                 * **[PixVerse AI](https://pixverse.ai/):** Cinematic pans, 4K rendering, and free daily credits.
                 """)
 
-    # ---- Dedicated Cloud & Colab Audio Studio ----
+    @st.fragment
+    def render_audio_studio_panel(is_colab_selected: bool):
+        with st.container(key="panel_audio_studio"):
+            panel_title("🎵", "Cloud & Colab Audio Studio", "Generate high-fidelity atmospheric music, cybernetic soundscapes, and action audio effects.")
+            if "tab3_aud_prompt" not in st.session_state:
+                st.session_state["tab3_aud_prompt"] = ""
+
+            c_aud_p, c_aud_ctrl = st.columns([2.6, 1.4], gap="medium")
+            with c_aud_p:
+                aud_preset = st.selectbox(
+                    "Audio Atmosphere & Preset:",
+                    options=list(AUDIO_PRESETS.keys()),
+                    key="tab3_aud_preset",
+                    on_change=on_aud_preset_change
+                )
+                aud_prompt_val = st.text_input(
+                    "Audio Prompt / Description:",
+                    key="tab3_aud_prompt",
+                    placeholder="Enter music style, genre, or mood (e.g., ambient synthwave, orchestral epic, acoustic lo-fi)..."
+                )
+            with c_aud_ctrl:
+                aud_dur = st.selectbox(
+                    "Track Duration:",
+                    ["4 Seconds", "8 Seconds", "15 Seconds", "30 Seconds"],
+                    index=0,
+                    key="tab3_aud_dur"
+                )
+                aud_dur_val = int(aud_dur.split()[0])
+                st.write("")
+                gen_aud_btn = btn("🎵 Generate Audio Track", type="primary")
+
+            aud_status_box = st.empty()
+            if gen_aud_btn:
+                resolved_aud_prompt = aud_prompt_val.strip() if aud_prompt_val and aud_prompt_val.strip() else AUDIO_PRESETS.get(aud_preset, "cinematic music soundtrack")
+                with st.spinner(f"Synthesizing {aud_dur_val}s audio track..."):
+                    t_aud0 = time.time()
+                    aud_data = None
+                    engine_tag = "Enhanced Studio Audio Synthesizer"
+
+                    # 1. Attempt Google Colab GPU Bridge if connected
+                    if st.session_state.get("colab_connected") and st.session_state.get("colab_tunnel_url"):
+                        try:
+                            aud_status_box.info("⚡ Routing to Google Colab 16GB Tesla T4 GPU Bridge...")
+                            aud_data = generate_colab_audio(
+                                st.session_state.colab_tunnel_url,
+                                resolved_aud_prompt,
+                                duration=aud_dur_val,
+                                status_placeholder=aud_status_box
+                            )
+                            engine_tag = "Google Colab 16GB Tesla T4 GPU"
+                        except Exception as c_err:
+                            aud_status_box.warning(f"Notice: Colab GPU busy ({c_err}), falling back to Enhanced Studio Engine...")
+                            aud_data = None
+
+                    # 2. Enhanced High-Fidelity Multi-Genre Audio Synthesizer
+                    if not aud_data:
+                        aud_data = generate_cinematic_soundtrack(resolved_aud_prompt, duration_sec=float(aud_dur_val))
+
+                    elapsed_aud = time.time() - t_aud0
+                    st.session_state.tab3_audio_bytes = aud_data
+                    st.session_state.tab3_audio_caption = f"Generated {aud_dur_val}s soundtrack via {engine_tag} in {elapsed_aud:.2f}s | 44.1kHz 16-bit Stereo PCM"
+                    aud_status_box.success(f"🎵 Generated {aud_dur_val}s cinematic audio track via {engine_tag} in {elapsed_aud:.2f}s!")
+
+            if st.session_state.tab3_audio_bytes:
+                uikit.media_card("audio", st.session_state.tab3_audio_bytes, key="tab3_aud_main")
+                st.caption(st.session_state.tab3_audio_caption)
+                render_media_export_card(
+                    st.session_state.tab3_audio_bytes,
+                    media_type="audio",
+                    default_filename=f"soundtrack_{int(time.time())}",
+                    key_prefix="tab3_aud_main",
+                    clear_keys=["tab3_audio_bytes", "tab3_audio_caption"]
+                )
+
+    hf_token = os.getenv("HF_TOKEN", "")
+    img_col, vid_col = st.columns(2, gap="large")
+
+    with img_col:
+        render_image_studio_panel(is_colab_selected, hf_token)
+
+    with vid_col:
+        render_video_studio_panel(is_colab_selected, hf_token)
+
     st.write("")
-    with st.container(key="panel_audio_studio"):
-        panel_title("🎵", "Cloud & Colab Audio Studio", "Generate high-fidelity atmospheric music, cybernetic soundscapes, and action audio effects.")
-        if "tab3_aud_prompt" not in st.session_state:
-            st.session_state["tab3_aud_prompt"] = ""
-
-        c_aud_p, c_aud_ctrl = st.columns([2.6, 1.4], gap="medium")
-        with c_aud_p:
-            aud_preset = st.selectbox(
-                "Audio Atmosphere & Preset:",
-                options=list(AUDIO_PRESETS.keys()),
-                key="tab3_aud_preset",
-                on_change=on_aud_preset_change
-            )
-            aud_prompt_val = st.text_input(
-                "Audio Prompt / Description:",
-                key="tab3_aud_prompt",
-                placeholder="Enter music style, genre, or mood (e.g., ambient synthwave, orchestral epic, acoustic lo-fi)..."
-            )
-        with c_aud_ctrl:
-            aud_dur = st.selectbox(
-                "Track Duration:",
-                ["4 Seconds", "8 Seconds", "15 Seconds", "30 Seconds"],
-                index=0,
-                key="tab3_aud_dur"
-            )
-            aud_dur_val = int(aud_dur.split()[0])
-            st.write("")
-            gen_aud_btn = btn("🎵 Generate Audio Track", type="primary")
-
-        aud_status_box = st.empty()
-        if gen_aud_btn:
-            resolved_aud_prompt = aud_prompt_val.strip() if aud_prompt_val and aud_prompt_val.strip() else AUDIO_PRESETS.get(aud_preset, "cinematic music soundtrack")
-            with st.spinner(f"Synthesizing {aud_dur_val}s audio track..."):
-                t_aud0 = time.time()
-                aud_data = None
-                engine_tag = "Enhanced Studio Audio Synthesizer"
-
-                # 1. Attempt Google Colab GPU Bridge if connected
-                if st.session_state.get("colab_connected") and st.session_state.get("colab_tunnel_url"):
-                    try:
-                        aud_status_box.info("⚡ Routing to Google Colab 16GB Tesla T4 GPU Bridge...")
-                        aud_data = generate_colab_audio(
-                            st.session_state.colab_tunnel_url,
-                            resolved_aud_prompt,
-                            duration=aud_dur_val,
-                            status_placeholder=aud_status_box
-                        )
-                        engine_tag = "Google Colab 16GB Tesla T4 GPU"
-                    except Exception as c_err:
-                        aud_status_box.warning(f"Notice: Colab GPU busy ({c_err}), falling back to Enhanced Studio Engine...")
-                        aud_data = None
-
-                # 2. Enhanced High-Fidelity Multi-Genre Audio Synthesizer
-                if not aud_data:
-                    aud_data = generate_cinematic_soundtrack(resolved_aud_prompt, duration_sec=float(aud_dur_val))
-
-                elapsed_aud = time.time() - t_aud0
-                st.session_state.tab3_audio_bytes = aud_data
-                st.session_state.tab3_audio_caption = f"Generated {aud_dur_val}s soundtrack via {engine_tag} in {elapsed_aud:.2f}s | 44.1kHz 16-bit Stereo PCM"
-                aud_status_box.success(f"🎵 Generated {aud_dur_val}s cinematic audio track via {engine_tag} in {elapsed_aud:.2f}s!")
-
-        if st.session_state.tab3_audio_bytes:
-            uikit.media_card("audio", st.session_state.tab3_audio_bytes, key="tab3_aud_main")
-            st.caption(st.session_state.tab3_audio_caption)
-            render_media_export_card(
-                st.session_state.tab3_audio_bytes,
-                media_type="audio",
-                default_filename=f"soundtrack_{int(time.time())}",
-                key_prefix="tab3_aud_main",
-                clear_keys=["tab3_audio_bytes", "tab3_audio_caption"]
-            )
+    render_audio_studio_panel(is_colab_selected)
 
 # ===================================================
 # TAB 4: DEPLOYMENT & FREE AI GUIDE
@@ -3389,135 +3428,146 @@ elif view == uikit.NAV[3]:
 
             st.caption("Deploy **any** repository in your GitHub account directly to Streamlit Community Cloud with zero configuration errors.")
 
-            # Load actual user repos
-            user_repos = get_user_github_repos(detected_user)
-            repo_options = [r["name"] for r in user_repos]
-            if "NiveshRakshak" not in repo_options:
-                repo_options.append("NiveshRakshak")
-            if "ai-hub" not in repo_options:
-                repo_options.insert(0, "ai-hub")
-            repo_options.append("➕ [ Custom Repository Name ]")
+            # Load actual user repos dynamically
+            active_user = st.session_state.get("tab4_gh_user", detected_user).strip() or detected_user
+            user_repos = get_user_github_repos(active_user)
+            repo_map = {r["name"]: r for r in user_repos}
+            repo_names = list(repo_map.keys())
+
+            repo_options = ["➕ [ Create New Repository on GitHub ]"] + repo_names
+            cur_repo = git_info.get("repo_name", "ai-hub")
+            def_idx = repo_options.index(cur_repo) if cur_repo in repo_options else (1 if len(repo_options) > 1 else 0)
 
             selected_repo_choice = st.selectbox(
-                "Select GitHub Repository to Deploy:",
+                "Select GitHub Repository to Deploy / Publish:",
                 options=repo_options,
-                index=repo_options.index("ai-hub") if "ai-hub" in repo_options else 0,
+                index=def_idx,
                 key="tab4_repo_selector"
             )
 
-            if selected_repo_choice == "➕ [ Custom Repository Name ]":
-                final_repo_name = st.text_input("Enter Repository Name:", value="NiveshRakshak", key="tab4_custom_repo_input")
+            is_new_repo = (selected_repo_choice == "➕ [ Create New Repository on GitHub ]")
+            if is_new_repo:
+                final_repo_name = st.text_input("Enter New Repository Name:", placeholder="e.g. my-new-agent-hub", key="tab4_custom_repo_input").strip()
+                default_branch = "main"
             else:
                 final_repo_name = selected_repo_choice
+                default_branch = repo_map.get(selected_repo_choice, {}).get("default_branch", "main")
 
             c_user, c_vis = st.columns([1.1, 0.9])
             with c_user:
-                gh_user = st.text_input("GitHub Username:", value=detected_user, key="tab4_gh_user")
+                gh_user = st.text_input("GitHub Username:", value=detected_user, key="tab4_gh_user").strip() or detected_user
             with c_vis:
                 vis_option = st.selectbox("Hosting Tier:", ["Public (100% Free Hosting)", "Private"], index=0, key="tab4_repo_vis")
 
             c_br, c_entry = st.columns([0.8, 1.2])
             with c_br:
-                branch_choice = st.text_input("Branch:", value="main", key="tab4_branch_name")
+                branch_choice = st.text_input("Branch:", value=default_branch, key="tab4_branch_name").strip() or "main"
             
             with c_entry:
-                # Dynamically discover all actual Python files inside the selected repository
-                discovered_py = get_repo_python_files(gh_user.strip(), final_repo_name.strip(), branch_choice.strip())
+                discovered_py = get_repo_python_files(gh_user, final_repo_name, branch_choice)
                 entrypoint_options = list(discovered_py)
                 if "➕ [ Custom File Path ]" not in entrypoint_options:
                     entrypoint_options.append("➕ [ Custom File Path ]")
 
-                default_entry = "backend/main.py" if (final_repo_name == "NiveshRakshak" or "backend/main.py" in entrypoint_options) else entrypoint_options[0]
                 entry_sel = st.selectbox(
                     "Main Python File (.py):",
                     options=entrypoint_options,
-                    index=entrypoint_options.index(default_entry) if default_entry in entrypoint_options else 0,
+                    index=0,
                     key="tab4_entry_sel"
                 )
                 if entry_sel == "➕ [ Custom File Path ]":
-                    entrypoint_file = st.text_input("Custom Entrypoint Path:", value="backend/main.py" if final_repo_name == "NiveshRakshak" else "app.py", key="tab4_custom_entry")
+                    entrypoint_file = st.text_input("Custom Entrypoint Path:", value="app.py", key="tab4_custom_entry").strip() or "app.py"
                 else:
                     entrypoint_file = entry_sel
 
-            repo_full_name = f"{gh_user.strip()}/{final_repo_name.strip()}"
-            deploy_1click_url = f"https://share.streamlit.io/deploy?repository={urllib.parse.quote(repo_full_name)}&branch={urllib.parse.quote(branch_choice.strip())}&mainModule={urllib.parse.quote(entrypoint_file.strip())}"
-            direct_blob_file_url = f"https://github.com/{repo_full_name}/blob/{branch_choice.strip()}/{entrypoint_file.strip()}"
+            repo_full_name = f"{gh_user}/{final_repo_name}" if final_repo_name else ""
+            deploy_1click_url = f"https://share.streamlit.io/deploy?repository={urllib.parse.quote(repo_full_name)}&branch={urllib.parse.quote(branch_choice)}&mainModule={urllib.parse.quote(entrypoint_file)}" if repo_full_name else "#"
+            direct_blob_file_url = f"https://github.com/{repo_full_name}/blob/{branch_choice}/{entrypoint_file}" if repo_full_name else ""
 
             # 1-Click Launch Container
             st.markdown(f"""
-            <div style="margin-top:1rem;padding:1.1rem;border-radius:12px;background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(34,211,238,0.08));border:1px solid rgba(99,102,241,0.35);box-shadow:0 8px 24px rgba(0,0,0,0.4);">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
-                <span style="font-weight:700;color:#38bdf8;font-size:0.96rem;">🚀 1-Click Streamlit Cloud Deployer</span>
-                <span style="font-size:0.75rem;padding:2px 8px;border-radius:6px;background:rgba(34,211,238,0.15);color:#22d3ee;font-weight:600;">RECOMMENDED</span>
+            <div style="margin-top:1rem;padding:1.2rem;border-radius:12px;background:#18181b;border:1px solid rgba(255,255,255,0.1);box-shadow:none;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+                <span style="font-weight:600;color:#ffffff;font-size:0.95rem;">🚀 1-Click Streamlit Cloud Deployer</span>
+                <span style="font-size:0.75rem;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.08);color:#f4f4f5;font-weight:500;">VERIFIED</span>
               </div>
-              <div style="font-size:0.83rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.8rem;">
-                Launches <code>{repo_full_name}</code> on Streamlit Community Cloud with branch <code>{branch_choice}</code> and entrypoint <code>{entrypoint_file}</code> automatically filled and pre-validated.
+              <div style="font-size:0.84rem;color:#a1a1aa;line-height:1.5;margin-bottom:0.9rem;">
+                Launches <code>{repo_full_name or 'repository'}</code> on Streamlit Community Cloud with branch <code>{branch_choice}</code> and entrypoint <code>{entrypoint_file}</code> automatically filled and pre-validated.
               </div>
-              <a href="{deploy_1click_url}" target="_blank" style="display:inline-block;padding:0.65rem 1.3rem;border-radius:10px;background:linear-gradient(135deg,#6366f1,#22d3ee);color:#ffffff;font-weight:700;text-decoration:none;box-shadow:0 8px 24px -4px rgba(99,102,241,0.7);transition:all 0.2s ease;">
-                🚀 Deploy '{final_repo_name}' Live on Streamlit Cloud ↗
+              <a href="{deploy_1click_url}" target="_blank" style="display:inline-block;padding:0.6rem 1.2rem;border-radius:8px;background:#ffffff;color:#09090b;font-weight:600;font-size:0.88rem;text-decoration:none;transition:all 0.15s ease;">
+                Deploy '{final_repo_name or 'Repository'}' Live on Streamlit Cloud ↗
               </a>
             </div>
             """, unsafe_allow_html=True)
 
-            # Manual Paste Direct URL (The Exact Fix for Screenshot 1 & 3 Red Error!)
+            # Manual Paste Direct URL
             st.markdown(f"""
-            <div style="margin-top:0.8rem;padding:1rem;border-radius:12px;background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.08);">
-              <div style="font-weight:600;color:#f59e0b;font-size:0.88rem;margin-bottom:0.3rem;">
+            <div style="margin-top:0.8rem;padding:1rem;border-radius:12px;background:#18181b;border:1px solid rgba(255,255,255,0.08);">
+              <div style="font-weight:600;color:#f4f4f5;font-size:0.88rem;margin-bottom:0.3rem;">
                 📋 Direct GitHub File URL (Fix for Streamlit's "Paste GitHub URL" Box)
               </div>
-              <div style="font-size:0.8rem;color:#94a3b8;line-height:1.45;margin-bottom:0.6rem;">
+              <div style="font-size:0.82rem;color:#a1a1aa;line-height:1.45;margin-bottom:0.6rem;">
                 💡 <b>Why Streamlit gave you that red error</b>: When using Streamlit's "Paste GitHub URL" field, you <b>must</b> paste the direct link to the <code>.py</code> file, NOT the repository homepage!
               </div>
             </div>
             """, unsafe_allow_html=True)
             st.code(direct_blob_file_url, language="text")
 
-            # Local publish / commit section (only if current repo matches)
-            if final_repo_name == (git_info.get("repo_name") or "ai-hub"):
-                st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
-                commit_note = st.text_input(
-                    "Local Workspace Commit Message:",
-                    value="Deploy AI Hub v5.0 - Multi-Model Hackathon Studio",
-                    key="tab4_commit_msg"
-                )
-                c_btn_push, c_btn_sync = st.columns([1.2, 0.8])
-                with c_btn_push:
-                    publish_btn = btn("✦ Push & Publish Local Code", type="primary")
-                with c_btn_sync:
-                    sync_btn = btn("↻ Sync Latest Changes")
+            # Workspace publish / commit section (active for any repo!)
+            st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
+            commit_default = f"Initial commit: Create {final_repo_name} hackathon app" if is_new_repo else f"Deploy updates to {final_repo_name} v5.0"
+            commit_note = st.text_input(
+                "Git Commit Message:",
+                value=commit_default,
+                key="tab4_commit_msg"
+            )
+            c_btn_push, c_btn_sync = st.columns([1.2, 0.8])
+            with c_btn_push:
+                btn_label = f"✦ Create & Push '{final_repo_name}' to GitHub" if is_new_repo else f"✦ Push Local Code to '{final_repo_name}'"
+                publish_btn = btn(btn_label, type="primary", disabled=not bool(final_repo_name))
+            with c_btn_sync:
+                sync_btn = btn("↻ Pull / Sync Latest Changes", disabled=not bool(final_repo_name) or is_new_repo)
 
-                publish_status = st.empty()
-                if publish_btn:
+            publish_status = st.empty()
+            if publish_btn:
+                if not final_repo_name:
+                    publish_status.error("Please enter or select a repository name first.")
+                else:
                     with st.spinner(f"Publishing project to GitHub ({repo_full_name})..."):
                         success, repo_res, deploy_link = execute_github_publish(
                             repo_name=final_repo_name,
                             account=gh_user,
                             is_public=("Public" in vis_option),
                             commit_msg=commit_note,
-                            status_placeholder=publish_status
+                            status_placeholder=publish_status,
+                            branch=branch_choice,
+                            entrypoint=entrypoint_file
                         )
                         if success:
                             st.session_state.deployed_repo_url = repo_res
                             st.session_state.deployed_share_url = deploy_link
-                            publish_status.success(f"Successfully pushed to GitHub: [{repo_res}]({repo_res})")
+                            publish_status.success(f"✓ Successfully published to GitHub: [{repo_res}]({repo_res})")
                             st.balloons()
+                            time.sleep(1)
                             st.rerun()
                         else:
                             publish_status.error(f"Deployment Error: {repo_res}")
 
-                if sync_btn:
-                    with st.spinner("Syncing latest changes to GitHub..."):
-                        success, repo_res, deploy_link = execute_github_publish(
-                            repo_name=final_repo_name,
-                            account=gh_user,
-                            is_public=("Public" in vis_option),
-                            commit_msg=commit_note,
-                            status_placeholder=publish_status
-                        )
-                        if success:
-                            st.toast("GitHub repository successfully updated!")
-                        else:
-                            publish_status.error(f"Sync Error: {repo_res}")
+            if sync_btn:
+                with st.spinner("Syncing latest changes to GitHub..."):
+                    success, repo_res, deploy_link = execute_github_publish(
+                        repo_name=final_repo_name,
+                        account=gh_user,
+                        is_public=("Public" in vis_option),
+                        commit_msg=commit_note,
+                        status_placeholder=publish_status,
+                        branch=branch_choice,
+                        entrypoint=entrypoint_file
+                    )
+                    if success:
+                        st.toast("GitHub repository successfully updated!")
+                    else:
+                        publish_status.error(f"Sync Error: {repo_res}")
 
         with c_gh_right:
             st.markdown("##### 2. Live Cloud Link & Secrets")
